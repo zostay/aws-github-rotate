@@ -16,12 +16,13 @@ import (
 )
 
 const (
-	githubAccessToken  = "***REMOVED***"
 	githubAccessKeyKey = "AWS_ACCESS_KEY_ID"
 	githubSecretKeyKey = "AWS_SECRET_ACCESS_KEY"
 )
 
 var (
+	githubAccessToken string
+
 	maxAge       = 336 * time.Hour
 	allowListOrg = map[string]struct{}{
 		"zostay": struct{}{},
@@ -319,6 +320,8 @@ func rotateOldSecrets(ctx context.Context, gc *github.Client, ps []Project) erro
 }
 
 func main() {
+	githubAccessToken = os.Getenv("GITHUB_ACCESS_TOKEN")
+
 	ctx := context.Background()
 	gc, err := githubClient(ctx, githubAccessToken)
 	if err != nil {
