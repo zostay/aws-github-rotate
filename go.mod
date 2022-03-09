@@ -5,6 +5,7 @@ go 1.17
 require (
 	github.com/aws/aws-sdk-go v1.43.9
 	github.com/google/go-github/v42 v42.0.0
+	github.com/jamesruan/sodium v1.0.14
 	golang.org/x/oauth2 v0.0.0-20211104180415-d3ed0bb246c8
 )
 

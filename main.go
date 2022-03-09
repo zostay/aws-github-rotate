@@ -11,6 +11,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/iam"
 	"github.com/google/go-github/v42/github"
+	"github.com/jamesruan/sodium"
 	"golang.org/x/oauth2"
 )
 
@@ -21,7 +22,7 @@ const (
 )
 
 var (
-	maxAge       = 336 * time.Hours
+	maxAge       = 336 * time.Hour
 	allowListOrg = map[string]struct{}{
 		"zostay": struct{}{},
 	}
@@ -109,7 +110,7 @@ func listReposWithSecrets(ctx context.Context, gc *github.Client) ([]Project, er
 				}
 				if secret.Name == githubSecretKeyKey {
 					sk = true
-					recordEarliesstUpdateDate(secret.UpdatedAt.Time)
+					recordEarliestUpdateDate(secret.UpdatedAt.Time)
 				}
 				if ak && sk {
 					break
@@ -120,7 +121,7 @@ func listReposWithSecrets(ctx context.Context, gc *github.Client) ([]Project, er
 				if user, ok := iamUsers[strings.Join([]string{owner, name}, "/")]; ok {
 					p := Project{
 						Owner: owner,
-						Name:  name,
+						Repo:  name,
 
 						User: user,
 
@@ -155,12 +156,66 @@ func listReposWithSecrets(ctx context.Context, gc *github.Client) ([]Project, er
 	return pws, nil
 }
 
-func getAccessKeys(ctx context.Context, user string) (*iam.AccessKeyMetadata, *iam.AccessKeyMetadata, error) {
-	ak, err := c.svc.LisAccessKeys(&iam.ListAccessKeysInput{
+func updateSecrets(ctx context.Context, gc *github.Client, ak, sk string, p Project) error {
+	pubKey, _, err := gc.Actions.GetRepoPublicKey(ctx, p.Owner, p.Repo)
+	if err != nil {
+		return fmt.Errorf("gc.Actions.GetRepoPublicKey(%q, %q): %w", p.Owner, p.Repo, err)
+	}
+	keyStr := ptrString(pubKey.Key)
+	keyIDStr := ptrString(pubKey.KeyID)
+
+	pkBox := sodium.BoxPublicKey{
+		Bytes: sodium.Bytes([]byte(keyStr)),
+	}
+
+	akBox := sodium.Bytes([]byte(ak))
+	akSealed := akBox.SealedBox(pkBox)
+
+	skBox := sodium.Bytes([]byte(sk))
+	skSealed := skBox.SealedBox(pkBox)
+
+	akEncSec := &github.EncryptedSecret{
+		Name:           githubAccessKeyKey,
+		KeyID:          keyIDStr,
+		EncryptedValue: string(akSealed),
+	}
+	_, err = gc.Actions.CreateOrUpdateRepoSecret(ctx, p.Owner, p.Repo, akEncSec)
+	if err != nil {
+		return fmt.Errorf("gc.Actions.CreateOrUpdateRepoSecret(%q, %q, %q): %w", p.Owner, p.Repo, githubAccessKeyKey, err)
+	}
+
+	skEncSec := &github.EncryptedSecret{
+		Name:           githubSecretKeyKey,
+		KeyID:          keyIDStr,
+		EncryptedValue: string(skSealed),
+	}
+	_, err = gc.Actions.CreateOrUpdateRepoSecret(ctx, p.Owner, p.Repo, skEncSec)
+	if err != nil {
+		return fmt.Errorf("gc.Actions.CreateOrUpdateRepoSecret(%q, %q, %q): %w", p.Owner, p.Repo, githubAccessKeyKey, err)
+	}
+
+	return nil
+}
+
+func getOlderApiKeyAge(ctx context.Context, svcIam *iam.IAM, user string) (time.Time, error) {
+	oldKey, newKey, err := getAccessKeys(ctx, svcIam, user)
+	if err != nil {
+		return time.Time{}, fmt.Errorf("getAccessKeys(%s): %w", user, err)
+	}
+
+	if oldKey == nil {
+		return aws.TimeValue(newKey.CreateDate), nil
+	}
+
+	return aws.TimeValue(oldKey.CreateDate), nil
+}
+
+func getAccessKeys(ctx context.Context, svcIam *iam.IAM, user string) (*iam.AccessKeyMetadata, *iam.AccessKeyMetadata, error) {
+	ak, err := svcIam.ListAccessKeys(&iam.ListAccessKeysInput{
 		UserName: aws.String(user),
 	})
 	if err != nil {
-		return nil, nil, fmt.Errorf("c.svc.ListAccessKeys(%q): %w", user, err)
+		return nil, nil, fmt.Errorf("svcIam.ListAccessKeys(%q): %w", user, err)
 	}
 
 	oldKey, newKey := examineKeys(ak.AccessKeyMetadata)
@@ -188,37 +243,71 @@ func examineKeys(akmds []*iam.AccessKeyMetadata) (*iam.AccessKeyMetadata, *iam.A
 	return oldestKey, newestKey
 }
 
-func rotateSecret(ctx context.Context, p Project) error {
-	fmt.Printf("Rotating IAM account for %s/%s\n", p.Owner, p.Name)
+func rotateSecretIam(ctx context.Context, svcIam *iam.IAM, p Project) (string, string, error) {
+	fmt.Printf("Rotating IAM account for %s/%s\n", p.Owner, p.Repo)
 
-	oldKey, newKey, err := getAccessKeys(ctx, p.User)
+	oldKey, _, err := getAccessKeys(ctx, svcIam, p.User)
 	if err != nil {
-		return fmt.Errorf("getAccessKeys(%q): %w", p.User, err)
+		return "", "", fmt.Errorf("getAccessKeys(%q): %w", p.User, err)
+	}
+
+	if oldKey != nil {
+		_, err := svcIam.DeleteAccessKey(&iam.DeleteAccessKeyInput{
+			UserName:    aws.String(p.User),
+			AccessKeyId: oldKey.AccessKeyId,
+		})
+		if err != nil {
+			return "", "", fmt.Errorf("svcIam.DeleteAccessKey(): %w", err)
+		}
+	}
+
+	ck, err := svcIam.CreateAccessKey(&iam.CreateAccessKeyInput{
+		UserName: aws.String(p.User),
+	})
+	if err != nil {
+		return "", "", fmt.Errorf("svcIam.CreateAccessKey(): %w", err)
+	}
+
+	accessKey := aws.StringValue(ck.AccessKey.AccessKeyId)
+	secretKey := aws.StringValue(ck.AccessKey.SecretAccessKey)
+
+	return accessKey, secretKey, nil
+}
+
+func rotateSecret(ctx context.Context, gc *github.Client, svcIam *iam.IAM, p Project) error {
+	ak, sk, err := rotateSecretIam(ctx, svcIam, p)
+	if err != nil {
+		return fmt.Errorf("rotateSecretIam(): %w", err)
+	}
+
+	err = updateSecrets(ctx, gc, ak, sk, p)
+	if err != nil {
+		return fmt.Errorf("updateSecrets(): %w", err)
 	}
 
 	return nil
 }
 
-func rotateOldSecrets(ctx context.Context, ps []Project) error {
+func rotateOldSecrets(ctx context.Context, gc *github.Client, ps []Project) error {
 	session := session.Must(session.NewSession())
 	svcIam := iam.New(session)
 
 	for _, p := range ps {
 		if time.Since(p.SecretUpdatedAt) > maxAge {
 			// secret is too old: rotate
-			err := rotateSecret(ctx, p)
+			err := rotateSecret(ctx, gc, svcIam, p)
 			if err != nil {
 				return fmt.Errorf("failed to rotate old secret: %w", err)
 			}
 		} else {
 			// the github secret is too old to be the current secret: rotate
-			keyAge, err := getOlderApiKeyAge(ctx, p.User)
+			keyAge, err := getOlderApiKeyAge(ctx, svcIam, p.User)
 			if err != nil {
 				return fmt.Errorf("failed to retrieve key age: %w", err)
 			}
 
 			if p.SecretUpdatedAt.Before(keyAge) {
-				err := rotateSecret(ctx, p)
+				err := rotateSecret(ctx, gc, svcIam, p)
 				if err != nil {
 					return fmt.Errorf("failed to rotate expired secret: %w", err)
 				}
@@ -241,7 +330,7 @@ func main() {
 		panic(fmt.Sprintf("unable list repositories with secrets: %v", err))
 	}
 
-	err = rotateOldSecrets(ctx, ps)
+	err = rotateOldSecrets(ctx, gc, ps)
 	if err != nil {
 		panic(fmt.Sprintf("unable to rotate secrets: %v", err))
 	}
