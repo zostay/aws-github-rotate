@@ -17,21 +17,25 @@ import (
 )
 
 const (
-	githubAccessKeyKey = "AWS_ACCESS_KEY_ID"
-	githubSecretKeyKey = "AWS_SECRET_ACCESS_KEY"
+	githubAccessKeyKey = "AWS_ACCESS_KEY_ID"     // github secret key for AWS access keys
+	githubSecretKeyKey = "AWS_SECRET_ACCESS_KEY" // github secret key for AWS secret keys
 
 	dryRun = false
 )
 
+// TODO Move all this into a viper configuration.
 var (
-	githubAccessToken string
+	githubAccessToken string // access token read from GITHUB_ACCESS_TOKEN
 
-	maxAge       = 336 * time.Hour
-	maxActiveAge = 168 * time.Hour
+	maxAge       = 168 * time.Hour // new keys must be newer than this or be rotated
+	maxActiveAge = 216 * time.Hour // old keys must be nwere than this or be disabled
+
+	// allowListOrg is the list of orgs I manage keys for
 	allowListOrg = map[string]struct{}{
 		"zostay": struct{}{},
 	}
 
+	// iamUsers is the list of projecs and the IAM users associated with them.
 	iamUsers = map[string]string{
 		"***REMOVED***":             "***REMOVED***",
 		"***REMOVED***":    "***REMOVED***",
@@ -45,6 +49,8 @@ var (
 	}
 )
 
+// githubClient connects to the github API client and returns it or returns an
+// error.
 func githubClient(ctx context.Context, gat string) (*github.Client, error) {
 	ts := oauth2.StaticTokenSource(
 		&oauth2.Token{AccessToken: githubAccessToken},
@@ -54,15 +60,27 @@ func githubClient(ctx context.Context, gat string) (*github.Client, error) {
 	return client, nil
 }
 
+// Project is the compiled metadata about each project for which we manage the
+// secrets and the associated secret metadata.
 type Project struct {
-	Owner string
-	Repo  string
+	Owner string // the org/user owning the repo
+	Repo  string // the name of the repo
 
-	User string
+	User string // the username associated with the repo (from local config)
 
-	SecretUpdatedAt time.Time
+	SecretUpdatedAt time.Time // last update time of the github action secret
+
+	// We cache access key metadata to avoid making multiple calls to IAM that
+	// return the same information.
+
+	OldestKey  *iam.AccessKeyMetadata // the oldest IAM key metadata
+	NewestKey  *iam.AccessKeyMetadata // the newest IAM key metadata
+	keysCached bool                   // true after oldestKey/newestKey are set (possibly to nil)
 }
 
+// ptrString is a clone of aws.String() for use with the github API. I suppose I
+// should just use aws.String(), but that feels wrong somehow. Does the github
+// API provide an analog? I'm too lazy to check.
 func ptrString(p *string) string {
 	if p != nil {
 		return *p
@@ -71,6 +89,7 @@ func ptrString(p *string) string {
 	}
 }
 
+// listReposWithSecrets compile all the Project metadata for projects we manage.
 func listReposWithSecrets(ctx context.Context, gc *github.Client) ([]Project, error) {
 	nextPage := 1
 	pws := make([]Project, 0)
@@ -161,6 +180,8 @@ func listReposWithSecrets(ctx context.Context, gc *github.Client) ([]Project, er
 	return pws, nil
 }
 
+// updateSecrets will replace the github action secrets with newly minted
+// values.
 func updateSecrets(ctx context.Context, gc *github.Client, ak, sk string, p Project) error {
 	pubKey, _, err := gc.Actions.GetRepoPublicKey(ctx, p.Owner, p.Repo)
 	if err != nil {
@@ -213,10 +234,11 @@ func updateSecrets(ctx context.Context, gc *github.Client, ak, sk string, p Proj
 	return nil
 }
 
-func getOlderApiKeyAge(ctx context.Context, svcIam *iam.IAM, user string) (time.Time, error) {
-	oldKey, newKey, err := getAccessKeys(ctx, svcIam, user)
+// getOlderApiKeyAge returns the oldest key age for a given IAM user.
+func getOlderApiKeyAge(ctx context.Context, svcIam *iam.IAM, p *Project) (time.Time, error) {
+	oldKey, newKey, err := getAccessKeys(ctx, svcIam, p)
 	if err != nil {
-		return time.Time{}, fmt.Errorf("getAccessKeys(%s): %w", user, err)
+		return time.Time{}, fmt.Errorf("getAccessKeys(%s): %w", p.User, err)
 	}
 
 	if oldKey == nil {
@@ -226,18 +248,31 @@ func getOlderApiKeyAge(ctx context.Context, svcIam *iam.IAM, user string) (time.
 	return aws.TimeValue(oldKey.CreateDate), nil
 }
 
-func getAccessKeys(ctx context.Context, svcIam *iam.IAM, user string) (*iam.AccessKeyMetadata, *iam.AccessKeyMetadata, error) {
+// getAccessKeys returns the access key metadata for an IAM user. This will
+// either return two nils (no key set) and an error or return two metadata
+// objects and no error (if one or two keys are set). If only a single key is
+// set then the first and second key returned will be equal.
+func getAccessKeys(ctx context.Context, svcIam *iam.IAM, p *Project) (*iam.AccessKeyMetadata, *iam.AccessKeyMetadata, error) {
+	if p.keysCached {
+		return p.OldestKey, p.NewestKey, nil
+	}
+
 	ak, err := svcIam.ListAccessKeys(&iam.ListAccessKeysInput{
-		UserName: aws.String(user),
+		UserName: aws.String(p.User),
 	})
 	if err != nil {
-		return nil, nil, fmt.Errorf("svcIam.ListAccessKeys(%q): %w", user, err)
+		return nil, nil, fmt.Errorf("svcIam.ListAccessKeys(%q): %w", p.User, err)
 	}
 
 	oldKey, newKey := examineKeys(ak.AccessKeyMetadata)
+	p.OldestKey = oldKey
+	p.NewestKey = newKey
+	p.keysCached = true
 	return oldKey, newKey, nil
 }
 
+// examineKeys will take a list of keys and will return exactly two: the first
+// returned is the oldest and the second returned is the newest.
 func examineKeys(akmds []*iam.AccessKeyMetadata) (*iam.AccessKeyMetadata, *iam.AccessKeyMetadata) {
 	var (
 		oldestTime = time.Now()
@@ -259,10 +294,15 @@ func examineKeys(akmds []*iam.AccessKeyMetadata) (*iam.AccessKeyMetadata, *iam.A
 	return oldestKey, newestKey
 }
 
-func rotateSecretIam(ctx context.Context, svcIam *iam.IAM, p Project) (string, string, error) {
+// rotateSecretIam performs all the actions on IAM required to rotate a new
+// access key. If there are multiple keys, the oldest one will be deleted. Then
+// a new one will be generated. This will not disable a key. This either returns
+// two nils and an error or the newly minted access key and secret key and no
+// error.
+func rotateSecretIam(ctx context.Context, svcIam *iam.IAM, p *Project) (string, string, error) {
 	fmt.Printf("Rotating IAM account for %s/%s\n", p.Owner, p.Repo)
 
-	oldKey, newKey, err := getAccessKeys(ctx, svcIam, p.User)
+	oldKey, newKey, err := getAccessKeys(ctx, svcIam, p)
 	if err != nil {
 		return "", "", fmt.Errorf("getAccessKeys(%q): %w", p.User, err)
 	}
@@ -277,6 +317,7 @@ func rotateSecretIam(ctx context.Context, svcIam *iam.IAM, p Project) (string, s
 
 	if oldKey != nil && oak != nak {
 		if !dryRun {
+			p.keysCached = false
 			_, err := svcIam.DeleteAccessKey(&iam.DeleteAccessKeyInput{
 				UserName:    aws.String(p.User),
 				AccessKeyId: oldKey.AccessKeyId,
@@ -289,6 +330,7 @@ func rotateSecretIam(ctx context.Context, svcIam *iam.IAM, p Project) (string, s
 
 	var accessKey, secretKey string
 	if !dryRun {
+		p.keysCached = false
 		ck, err := svcIam.CreateAccessKey(&iam.CreateAccessKeyInput{
 			UserName: aws.String(p.User),
 		})
@@ -306,13 +348,43 @@ func rotateSecretIam(ctx context.Context, svcIam *iam.IAM, p Project) (string, s
 	return accessKey, secretKey, nil
 }
 
-func rotateSecret(ctx context.Context, gc *github.Client, svcIam *iam.IAM, p Project) error {
+// needsRotation returns true if the named secret requires rotation.
+func needsRotation(ctx context.Context, svcIam *iam.IAM, p *Project) (bool, error) {
+	// is github action secret too old?
+	needsRotation := time.Since(p.SecretUpdatedAt) > maxAge
+
+	// Even if the github secret is new, it may be the the github action secret
+	// is older than the current IAM secret. Let's check.
+	if !needsRotation {
+		// the github secret is too old to be the current secret: rotate
+		keyAge, err := getOlderApiKeyAge(ctx, svcIam, p)
+		if err != nil {
+			return false, fmt.Errorf("failed to retrieve key age: %w", err)
+		}
+
+		// is the github copy of the secret too old?
+		needsRotation = p.SecretUpdatedAt.Before(keyAge)
+	}
+
+	return needsRotation, nil
+}
+
+// rotateSecret rotates a single project's secret in IAM and then updates the
+// github action secret keys with the newly minted access key and secret key.
+func rotateSecret(ctx context.Context, gc *github.Client, svcIam *iam.IAM, p *Project) error {
+	needed, err := needsRotation(ctx, svcIam, p)
+	if err != nil {
+		return err
+	} else if !needed {
+		return nil
+	}
+
 	ak, sk, err := rotateSecretIam(ctx, svcIam, p)
 	if err != nil {
 		return fmt.Errorf("rotateSecretIam(): %w", err)
 	}
 
-	err = updateSecrets(ctx, gc, ak, sk, p)
+	err = updateSecrets(ctx, gc, ak, sk, *p)
 	if err != nil {
 		return fmt.Errorf("updateSecrets(): %w", err)
 	}
@@ -320,34 +392,59 @@ func rotateSecret(ctx context.Context, gc *github.Client, svcIam *iam.IAM, p Pro
 	return nil
 }
 
-func rotateOldSecrets(ctx context.Context, gc *github.Client, ps []Project) error {
-	session := session.Must(session.NewSession())
-	svcIam := iam.New(session)
+// rotateSecrets goes through all the projects, determines which have
+// outdated keys (i.e., they are older than maxAge) or a mismatch between IAM
+// information and github information and performs rotation on those services.
+// All github services should have working keys after this operation is
+// performed.
+func rotateSecrets(ctx context.Context, gc *github.Client, svcIam *iam.IAM, ps []Project) error {
+	for i := range ps {
+		err := rotateSecret(ctx, gc, svcIam, &ps[i])
+		if err != nil {
+			return fmt.Errorf("failed to rotate secret: %w", err)
+		}
+	}
 
-	for _, p := range ps {
-		if time.Since(p.SecretUpdatedAt) > maxAge {
-			// secret is too old: rotate
-			err := rotateSecret(ctx, gc, svcIam, p)
-			if err != nil {
-				return fmt.Errorf("failed to rotate old secret: %w", err)
-			}
-			// fmt.Println("Quitting 1 for testing.")
-			// os.Exit(0)
-		} else {
-			// the github secret is too old to be the current secret: rotate
-			keyAge, err := getOlderApiKeyAge(ctx, svcIam, p.User)
-			if err != nil {
-				return fmt.Errorf("failed to retrieve key age: %w", err)
-			}
+	return nil
+}
 
-			if p.SecretUpdatedAt.Before(keyAge) {
-				err := rotateSecret(ctx, gc, svcIam, p)
-				if err != nil {
-					return fmt.Errorf("failed to rotate expired secret: %w", err)
-				}
-				// fmt.Println("Quitting 2 for testing.")
-				// os.Exit(0)
-			}
+// disableSecret examines the given project to see if the oldestKey is older
+// than the maxActiveAge. If it is older, then the key is disabled in IAM. If
+// not, then it is left alone.
+func disableSecret(ctx context.Context, svcIam *iam.IAM, p *Project) error {
+	okey, _, err := getAccessKeys(ctx, svcIam, p)
+	if err != nil {
+		return fmt.Errorf("failed to retrieve key information: %w", err)
+	}
+
+	createDate := aws.TimeValue(okey.CreateDate)
+	needsDisabled := time.Since(createDate) > maxActiveAge
+	if !needsDisabled {
+		return nil
+	}
+
+	fmt.Printf("Disabling old IAM account key for %s/%s\n", p.Owner, p.Repo)
+
+	p.keysCached = false
+	_, err = svcIam.UpdateAccessKey(&iam.UpdateAccessKeyInput{
+		AccessKeyId: okey.AccessKeyId,
+		Status:      aws.String(iam.StatusTypeInactive),
+		UserName:    aws.String(p.User),
+	})
+	if err != nil {
+		return fmt.Errorf("failed to update access key status to inactive: %w", err)
+	}
+
+	return nil
+}
+
+// disableOldSecrets examines all the IAM keys and disables any of the
+// non-active keys that have surpassed the maxActiveAge.
+func disableOldSecrets(ctx context.Context, svcIam *iam.IAM, ps []Project) error {
+	for i := range ps {
+		err := disableSecret(ctx, svcIam, &ps[i])
+		if err != nil {
+			return fmt.Errorf("failed to disable secret: %w", err)
 		}
 	}
 
@@ -368,8 +465,16 @@ func main() {
 		panic(fmt.Sprintf("unable list repositories with secrets: %v", err))
 	}
 
-	err = rotateOldSecrets(ctx, gc, ps)
+	session := session.Must(session.NewSession())
+	svcIam := iam.New(session)
+
+	err = rotateSecrets(ctx, gc, svcIam, ps)
 	if err != nil {
 		panic(fmt.Sprintf("unable to rotate secrets: %v", err))
+	}
+
+	err = disableOldSecrets(ctx, svcIam, ps)
+	if err != nil {
+		panic(fmt.Sprintf("unable to disable expired secrets: %v", err))
 	}
 }
