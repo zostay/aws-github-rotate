@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"os"
 	"strings"
@@ -18,12 +19,15 @@ import (
 const (
 	githubAccessKeyKey = "AWS_ACCESS_KEY_ID"
 	githubSecretKeyKey = "AWS_SECRET_ACCESS_KEY"
+
+	dryRun = false
 )
 
 var (
 	githubAccessToken string
 
 	maxAge       = 336 * time.Hour
+	maxActiveAge = 168 * time.Hour
 	allowListOrg = map[string]struct{}{
 		"zostay": struct{}{},
 	}
@@ -97,7 +101,7 @@ func listReposWithSecrets(ctx context.Context, gc *github.Client) ([]Project, er
 			}
 
 			var ak, sk bool
-			var updated time.Time
+			updated := time.Now()
 			recordEarliestUpdateDate := func(t time.Time) {
 				if t.Before(updated) {
 					updated = t
@@ -162,7 +166,14 @@ func updateSecrets(ctx context.Context, gc *github.Client, ak, sk string, p Proj
 	if err != nil {
 		return fmt.Errorf("gc.Actions.GetRepoPublicKey(%q, %q): %w", p.Owner, p.Repo, err)
 	}
+
 	keyStr := ptrString(pubKey.Key)
+	decKeyBytes, err := base64.StdEncoding.DecodeString(keyStr)
+	if err != nil {
+		return fmt.Errorf("base64.StdEncoding.DecodeString(): %w", err)
+	}
+	keyStr = string(decKeyBytes)
+
 	keyIDStr := ptrString(pubKey.KeyID)
 
 	pkBox := sodium.BoxPublicKey{
@@ -171,28 +182,32 @@ func updateSecrets(ctx context.Context, gc *github.Client, ak, sk string, p Proj
 
 	akBox := sodium.Bytes([]byte(ak))
 	akSealed := akBox.SealedBox(pkBox)
+	akEncSealed := base64.StdEncoding.EncodeToString(akSealed)
 
 	skBox := sodium.Bytes([]byte(sk))
 	skSealed := skBox.SealedBox(pkBox)
+	skEncSealed := base64.StdEncoding.EncodeToString(skSealed)
 
-	akEncSec := &github.EncryptedSecret{
-		Name:           githubAccessKeyKey,
-		KeyID:          keyIDStr,
-		EncryptedValue: string(akSealed),
-	}
-	_, err = gc.Actions.CreateOrUpdateRepoSecret(ctx, p.Owner, p.Repo, akEncSec)
-	if err != nil {
-		return fmt.Errorf("gc.Actions.CreateOrUpdateRepoSecret(%q, %q, %q): %w", p.Owner, p.Repo, githubAccessKeyKey, err)
-	}
+	if !dryRun {
+		akEncSec := &github.EncryptedSecret{
+			Name:           githubAccessKeyKey,
+			KeyID:          keyIDStr,
+			EncryptedValue: akEncSealed,
+		}
+		_, err = gc.Actions.CreateOrUpdateRepoSecret(ctx, p.Owner, p.Repo, akEncSec)
+		if err != nil {
+			return fmt.Errorf("gc.Actions.CreateOrUpdateRepoSecret(%q, %q, %q): %w", p.Owner, p.Repo, githubAccessKeyKey, err)
+		}
 
-	skEncSec := &github.EncryptedSecret{
-		Name:           githubSecretKeyKey,
-		KeyID:          keyIDStr,
-		EncryptedValue: string(skSealed),
-	}
-	_, err = gc.Actions.CreateOrUpdateRepoSecret(ctx, p.Owner, p.Repo, skEncSec)
-	if err != nil {
-		return fmt.Errorf("gc.Actions.CreateOrUpdateRepoSecret(%q, %q, %q): %w", p.Owner, p.Repo, githubAccessKeyKey, err)
+		skEncSec := &github.EncryptedSecret{
+			Name:           githubSecretKeyKey,
+			KeyID:          keyIDStr,
+			EncryptedValue: skEncSealed,
+		}
+		_, err = gc.Actions.CreateOrUpdateRepoSecret(ctx, p.Owner, p.Repo, skEncSec)
+		if err != nil {
+			return fmt.Errorf("gc.Actions.CreateOrUpdateRepoSecret(%q, %q, %q): %w", p.Owner, p.Repo, githubAccessKeyKey, err)
+		}
 	}
 
 	return nil
@@ -247,30 +262,46 @@ func examineKeys(akmds []*iam.AccessKeyMetadata) (*iam.AccessKeyMetadata, *iam.A
 func rotateSecretIam(ctx context.Context, svcIam *iam.IAM, p Project) (string, string, error) {
 	fmt.Printf("Rotating IAM account for %s/%s\n", p.Owner, p.Repo)
 
-	oldKey, _, err := getAccessKeys(ctx, svcIam, p.User)
+	oldKey, newKey, err := getAccessKeys(ctx, svcIam, p.User)
 	if err != nil {
 		return "", "", fmt.Errorf("getAccessKeys(%q): %w", p.User, err)
 	}
 
+	var oak, nak string
 	if oldKey != nil {
-		_, err := svcIam.DeleteAccessKey(&iam.DeleteAccessKeyInput{
-			UserName:    aws.String(p.User),
-			AccessKeyId: oldKey.AccessKeyId,
-		})
-		if err != nil {
-			return "", "", fmt.Errorf("svcIam.DeleteAccessKey(): %w", err)
+		oak = aws.StringValue(oldKey.AccessKeyId)
+	}
+	if newKey != nil {
+		nak = aws.StringValue(newKey.AccessKeyId)
+	}
+
+	if oldKey != nil && oak != nak {
+		if !dryRun {
+			_, err := svcIam.DeleteAccessKey(&iam.DeleteAccessKeyInput{
+				UserName:    aws.String(p.User),
+				AccessKeyId: oldKey.AccessKeyId,
+			})
+			if err != nil {
+				return "", "", fmt.Errorf("svcIam.DeleteAccessKey(): %w", err)
+			}
 		}
 	}
 
-	ck, err := svcIam.CreateAccessKey(&iam.CreateAccessKeyInput{
-		UserName: aws.String(p.User),
-	})
-	if err != nil {
-		return "", "", fmt.Errorf("svcIam.CreateAccessKey(): %w", err)
-	}
+	var accessKey, secretKey string
+	if !dryRun {
+		ck, err := svcIam.CreateAccessKey(&iam.CreateAccessKeyInput{
+			UserName: aws.String(p.User),
+		})
+		if err != nil {
+			return "", "", fmt.Errorf("svcIam.CreateAccessKey(): %w", err)
+		}
 
-	accessKey := aws.StringValue(ck.AccessKey.AccessKeyId)
-	secretKey := aws.StringValue(ck.AccessKey.SecretAccessKey)
+		accessKey = aws.StringValue(ck.AccessKey.AccessKeyId)
+		secretKey = aws.StringValue(ck.AccessKey.SecretAccessKey)
+	} else {
+		accessKey = "dryrunfakeaccesskey"
+		secretKey = "dryrunfakesecretkey"
+	}
 
 	return accessKey, secretKey, nil
 }
@@ -300,6 +331,8 @@ func rotateOldSecrets(ctx context.Context, gc *github.Client, ps []Project) erro
 			if err != nil {
 				return fmt.Errorf("failed to rotate old secret: %w", err)
 			}
+			// fmt.Println("Quitting 1 for testing.")
+			// os.Exit(0)
 		} else {
 			// the github secret is too old to be the current secret: rotate
 			keyAge, err := getOlderApiKeyAge(ctx, svcIam, p.User)
@@ -312,6 +345,8 @@ func rotateOldSecrets(ctx context.Context, gc *github.Client, ps []Project) erro
 				if err != nil {
 					return fmt.Errorf("failed to rotate expired secret: %w", err)
 				}
+				// fmt.Println("Quitting 2 for testing.")
+				// os.Exit(0)
 			}
 		}
 	}
