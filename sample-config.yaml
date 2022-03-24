@@ -1,0 +1,26 @@
+---
+rotate_after: "168h"
+disable_after: "48h"
+
+default_access_key: AWS_ACCESS_KEY_ID
+default_secret_key: AWS_SECRET_ACCESS_KEY
+
+projects:
+  - name: ***REMOVED***
+    user: ***REMOVED***
+  - name: ***REMOVED***
+    user: ***REMOVED***
+  - name: ***REMOVED***
+    user: ***REMOVED***
+  - name: zostay/periodic-s3-sync
+    user: ***REMOVED***
+  - name: zostay/postfix
+    user: ***REMOVED***
+  - name: ***REMOVED***
+    user: ***REMOVED***
+  - name: ***REMOVED***
+    user: ***REMOVED***
+  - name: ***REMOVED***
+    user: ***REMOVED***
+  - name: ***REMOVED***
+    user: ***REMOVED***
