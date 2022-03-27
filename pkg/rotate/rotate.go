@@ -16,6 +16,23 @@ import (
 	"github.com/zostay/aws-github-rotate/internal/config"
 )
 
+// Project is the compiled metadata about each project for which we manage the
+// secrets and the associated secret metadata.
+type Project struct {
+	*config.Project
+
+	SecretUpdatedAt time.Time // last update time of the github action secret
+
+	// We cache access key metadata to avoid making multiple calls to IAM that
+	// return the same information.
+
+	OldestKey  *iam.AccessKeyMetadata // the oldest IAM key metadata
+	NewestKey  *iam.AccessKeyMetadata // the newest IAM key metadata
+	keysCached bool                   // true after oldestKey/newestKey are set (possibly to nil)
+}
+
+// Rotate is an object capable of rotating a bunch of configured AWS password
+// related to github objects and then update the related action secrets.
 type Rotate struct {
 	gc     *github.Client
 	iamSvc *iam.IAM
@@ -49,21 +66,6 @@ func New(
 	}
 }
 
-// Project is the compiled metadata about each project for which we manage the
-// secrets and the associated secret metadata.
-type Project struct {
-	*config.Project
-
-	SecretUpdatedAt time.Time // last update time of the github action secret
-
-	// We cache access key metadata to avoid making multiple calls to IAM that
-	// return the same information.
-
-	OldestKey  *iam.AccessKeyMetadata // the oldest IAM key metadata
-	NewestKey  *iam.AccessKeyMetadata // the newest IAM key metadata
-	keysCached bool                   // true after oldestKey/newestKey are set (possibly to nil)
-}
-
 // ptrString is a clone of aws.String() for use with the github API. I suppose I
 // should just use aws.String(), but that feels wrong somehow. Does the github
 // API provide an analog? I'm too lazy to check.
@@ -75,7 +77,8 @@ func ptrString(p *string) string {
 	}
 }
 
-// listReposWithSecrets compile all the Project metadata for projects we manage.
+// updateProjectsWithSecrets compiles all the Project metadata for projects we
+// manage. It prepares the object for perforing rotations.
 func (r *Rotate) updateProjectsWithSecrets(ctx context.Context) error {
 	nextPage := 1
 	for {
