@@ -26,22 +26,43 @@ type Config struct {
 	DisableAfter time.Duration `yaml:"disable_after"` // the amount of time to wait before an old secret become disabled
 
 	Projects []Project // the project configurations
+
+	ProjectMap map[string]*Project // the project configurations in map form
 }
 
-// ProjectMap converts the list of project configurations into a map. It returns
-// an error if, in the process, it is discovered that a project name is
-// repeated.
-func (c Config) ProjectMap() (map[string]*Project, error) {
+// Prepare performs some cleanup on the configuration to make it ready for
+// general consumption. This will:
+//
+// 1. Check for duplicated configuration (i.e., each project name must only
+//    appear once),
+// 2. Make sure every Project configuration has an AccessKey and SecretKey
+//    setting.
+// 3. Constructs ProjectMap from Projects
+//
+// This will return an error if the configuration is found to be invalid for
+// soem reason. Returns nil on success.
+func (c *Config) Prepare() error {
 	pm := make(map[string]Project, len(c.Projects))
 
 	for i := range c.Projects {
 		if _, alreadyExists := pm[c.Projects[i].Name]; alreadyExists {
-			return nil, fmt.Errorf("The project named %q is repeated twice in the configuration.", c.Projects[i].Name)
+			return fmt.Errorf("The project named %q is repeated twice in the configuration.", c.Projects[i].Name)
 		}
+
+		if c.Projects[i].AccessKey == "" {
+			c.Projects[i].AccessKey = c.DefaultAccessKey
+		}
+
+		if c.Projects[i].SecretKey == "" {
+			c.Projects[i].SecretKey = c.DefaultSecretKey
+		}
+
 		pm[c.Projects[i].Name] = &c.Projects[i]
 	}
 
-	return pm, nil
+	c.ProjectMap = pm
+
+	return nil
 }
 
 // Repo is the repository part of the Name.
