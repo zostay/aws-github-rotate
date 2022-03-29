@@ -43,6 +43,7 @@ type Rotate struct {
 	projects map[string]*Project
 }
 
+// New constructs a new object to perform password rotation.
 func New(
 	gc *github.Client,
 	svcIam *iam.IAM,
@@ -68,7 +69,7 @@ func New(
 
 // ptrString is a clone of aws.String() for use with the github API. I suppose I
 // should just use aws.String(), but that feels wrong somehow. Does the github
-// API provide an analog? I'm too lazy to check.
+// Go SDK provide an analog? I'm too lazy to check.
 func ptrString(p *string) string {
 	if p != nil {
 		return *p
