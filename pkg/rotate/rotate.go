@@ -67,9 +67,9 @@ func New(
 	}
 }
 
-// updateProjectsWithSecrets compiles all the Project metadata for projects we
-// manage. It prepares the object for perforing rotations.
-func (r *Rotate) updateProjectsWithSecrets(ctx context.Context) error {
+// refreshGithubState compiles all the Project metadata for projects we manage.
+// It prepares the object for perforing rotations.
+func (r *Rotate) refreshGithubState(ctx context.Context) error {
 	nextPage := 1
 	for {
 		opt := &github.RepositoryListOptions{
@@ -79,14 +79,15 @@ func (r *Rotate) updateProjectsWithSecrets(ctx context.Context) error {
 		}
 		repos, res, err := r.gc.Repositories.List(ctx, "", opt)
 		if err != nil {
-			return nil, fmt.Errorf("unable to list repositories: %w", err)
+			return fmt.Errorf("unable to list repositories: %w", err)
 		}
 
 		for _, repo := range repos {
 			owner := github.Stringify(repo.Owner.Login)
 			repo := github.Stringify(repo.Name)
 			name := strings.Join([]string{owner, repo}, "/")
-			if _, configured := r.projects[name]; !configured {
+			p, configured := r.projects[name]
+			if !configured {
 				continue
 			}
 
@@ -122,15 +123,7 @@ func (r *Rotate) updateProjectsWithSecrets(ctx context.Context) error {
 
 			if ak && sk {
 				if user, ok := iamUsers[strings.Join([]string{owner, name}, "/")]; ok {
-					p := Project{
-						Owner: owner,
-						Repo:  name,
-
-						User: user,
-
-						SecretUpdatedAt: updated,
-					}
-					pws = append(pws, p)
+					p.SecretUpdatedAt = updated
 				} else {
 					fmt.Fprintf(
 						os.Stderr,
@@ -156,7 +149,7 @@ func (r *Rotate) updateProjectsWithSecrets(ctx context.Context) error {
 		nextPage = res.NextPage
 	}
 
-	return pws, nil
+	return nil
 }
 
 // updateSecrets will replace the github action secrets with newly minted
