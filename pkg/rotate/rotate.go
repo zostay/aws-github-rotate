@@ -3,6 +3,7 @@ package rotate
 import (
 	"context"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -29,6 +30,39 @@ type Project struct {
 	OldestKey  *iam.AccessKeyMetadata // the oldest IAM key metadata
 	NewestKey  *iam.AccessKeyMetadata // the newest IAM key metadata
 	keysCached bool                   // true after oldestKey/newestKey are set (possibly to nil)
+}
+
+// TouchGithub sets the SecretUpdatedAt time to right now.
+func (p *Project) TouchGithub() {
+	p.SecretUpdatedAt = time.Now()
+}
+
+// ClearAWS clears the oldest and newest key cache.
+func (p *Project) ClearAWSKeyCache() {
+	p.OldestKey = nil
+	p.NewestKey = nil
+	p.keysCached = false
+}
+
+var (
+	ErrNotCached = errors.New("AWS keys not cached")
+)
+
+// GetAWSCache returns the cached keys and nil if they are cached or two nils
+// and an error if they are not cached.
+func (p *Project) GetAWSKeyCache() (*iam.AccessKeyMetadata, *iam.AccessKeyMetadata, error) {
+	if p.keysCached {
+		return p.OldestKey, p.NewestKey, nil
+	} else {
+		return nil, nil, ErrNotCached
+	}
+}
+
+// SetAWSCache sets the AWS key cache to the given keys.
+func (p *Project) SetAWSKeyCache(o, n *iam.AccessKeyMetadata) {
+	p.OldestKey = o
+	p.NewestKey = n
+	p.keysCached = true
 }
 
 // Rotate is an object capable of rotating a bunch of configured AWS password
@@ -152,10 +186,9 @@ func (r *Rotate) refreshGithubState(ctx context.Context) error {
 	return nil
 }
 
-// updateSecrets will replace the github action secrets with newly minted
-// values.
-func updateSecrets(ctx context.Context, gc *github.Client, ak, sk string, p Project) error {
-	pubKey, _, err := gc.Actions.GetRepoPublicKey(ctx, p.Owner, p.Repo)
+// UpdateGithub will replace the github action secrets with newly minted values.
+func (r *Rotate) UpdateGithub(ctx context.Context, ak, sk string, p *Project) error {
+	pubKey, _, err := gc.Actions.GetRepoPublicKey(ctx, p.Owner(), p.Repo())
 	if err != nil {
 		return fmt.Errorf("gc.Actions.GetRepoPublicKey(%q, %q): %w", p.Owner, p.Repo, err)
 	}
@@ -201,14 +234,16 @@ func updateSecrets(ctx context.Context, gc *github.Client, ak, sk string, p Proj
 		if err != nil {
 			return fmt.Errorf("gc.Actions.CreateOrUpdateRepoSecret(%q, %q, %q): %w", p.Owner, p.Repo, githubAccessKeyKey, err)
 		}
+
+		p.TouchGithub()
 	}
 
 	return nil
 }
 
 // getOlderApiKeyAge returns the oldest key age for a given IAM user.
-func getOlderApiKeyAge(ctx context.Context, svcIam *iam.IAM, p *Project) (time.Time, error) {
-	oldKey, newKey, err := getAccessKeys(ctx, svcIam, p)
+func (r *Rotate) getOlderApiKeyAge(ctx context.Context, p *Project) (time.Time, error) {
+	oldKey, newKey, err := r.getAccessKeys(ctx, p)
 	if err != nil {
 		return time.Time{}, fmt.Errorf("getAccessKeys(%s): %w", p.User, err)
 	}
@@ -224,9 +259,9 @@ func getOlderApiKeyAge(ctx context.Context, svcIam *iam.IAM, p *Project) (time.T
 // either return two nils (no key set) and an error or return two metadata
 // objects and no error (if one or two keys are set). If only a single key is
 // set then the first and second key returned will be equal.
-func getAccessKeys(ctx context.Context, svcIam *iam.IAM, p *Project) (*iam.AccessKeyMetadata, *iam.AccessKeyMetadata, error) {
-	if p.keysCached {
-		return p.OldestKey, p.NewestKey, nil
+func (r *Rotate) getAccessKeys(ctx context.Context, p *Project) (*iam.AccessKeyMetadata, *iam.AccessKeyMetadata, error) {
+	if o, n, err := p.GetAWSKeyCache(); err == nil {
+		return o, n, nil
 	}
 
 	ak, err := svcIam.ListAccessKeys(&iam.ListAccessKeysInput{
@@ -237,9 +272,7 @@ func getAccessKeys(ctx context.Context, svcIam *iam.IAM, p *Project) (*iam.Acces
 	}
 
 	oldKey, newKey := examineKeys(ak.AccessKeyMetadata)
-	p.OldestKey = oldKey
-	p.NewestKey = newKey
-	p.keysCached = true
+	p.SetAWSKeyCache(oldKey, newKey)
 	return oldKey, newKey, nil
 }
 
@@ -266,15 +299,15 @@ func examineKeys(akmds []*iam.AccessKeyMetadata) (*iam.AccessKeyMetadata, *iam.A
 	return oldestKey, newestKey
 }
 
-// rotateSecretIam performs all the actions on IAM required to rotate a new
+// RotateAWSSecret performs all the actions on IAM required to rotate a new
 // access key. If there are multiple keys, the oldest one will be deleted. Then
 // a new one will be generated. This will not disable a key. This either returns
 // two nils and an error or the newly minted access key and secret key and no
 // error.
-func rotateSecretIam(ctx context.Context, svcIam *iam.IAM, p *Project) (string, string, error) {
-	fmt.Printf("Rotating IAM account for %s/%s\n", p.Owner, p.Repo)
+func (r *Rotate) rotateAWSSecret(ctx context.Context, p *Project) (string, string, error) {
+	fmt.Printf("Rotating IAM account for %s/%s\n", p.Owner(), p.Repo())
 
-	oldKey, newKey, err := getAccessKeys(ctx, svcIam, p)
+	oldKey, newKey, err := r.getAccessKeys(ctx, p)
 	if err != nil {
 		return "", "", fmt.Errorf("getAccessKeys(%q): %w", p.User, err)
 	}
@@ -289,7 +322,7 @@ func rotateSecretIam(ctx context.Context, svcIam *iam.IAM, p *Project) (string, 
 
 	if oldKey != nil && oak != nak {
 		if !dryRun {
-			p.keysCached = false
+			p.ClearAWSKeyCache()
 			_, err := svcIam.DeleteAccessKey(&iam.DeleteAccessKeyInput{
 				UserName:    aws.String(p.User),
 				AccessKeyId: oldKey.AccessKeyId,
@@ -321,7 +354,7 @@ func rotateSecretIam(ctx context.Context, svcIam *iam.IAM, p *Project) (string, 
 }
 
 // needsRotation returns true if the named secret requires rotation.
-func needsRotation(ctx context.Context, svcIam *iam.IAM, p *Project) (bool, error) {
+func (r *Rotate) NeedsRotation(ctx context.Context, p *Project) (bool, error) {
 	// is github action secret too old?
 	needsRotation := time.Since(p.SecretUpdatedAt) > maxAge
 
@@ -329,7 +362,7 @@ func needsRotation(ctx context.Context, svcIam *iam.IAM, p *Project) (bool, erro
 	// is older than the current IAM secret. Let's check.
 	if !needsRotation {
 		// the github secret is too old to be the current secret: rotate
-		keyAge, err := getOlderApiKeyAge(ctx, svcIam, p)
+		keyAge, err := r.getOlderApiKeyAge(ctx, p)
 		if err != nil {
 			return false, fmt.Errorf("failed to retrieve key age: %w", err)
 		}
@@ -341,22 +374,22 @@ func needsRotation(ctx context.Context, svcIam *iam.IAM, p *Project) (bool, erro
 	return needsRotation, nil
 }
 
-// rotateSecret rotates a single project's secret in IAM and then updates the
+// RotateSecret rotates a single project's secret in IAM and then updates the
 // github action secret keys with the newly minted access key and secret key.
-func rotateSecret(ctx context.Context, gc *github.Client, svcIam *iam.IAM, p *Project) error {
-	needed, err := needsRotation(ctx, svcIam, p)
+func (r *Rotate) RotateSecret(ctx context.Context, p *Project) error {
+	needed, err := r.NeedsRotation(ctx, p)
 	if err != nil {
 		return err
 	} else if !needed {
 		return nil
 	}
 
-	ak, sk, err := rotateSecretIam(ctx, svcIam, p)
+	ak, sk, err := r.RotateAWSSecret(ctx, p)
 	if err != nil {
 		return fmt.Errorf("rotateSecretIam(): %w", err)
 	}
 
-	err = updateSecrets(ctx, gc, ak, sk, *p)
+	err = r.UpdateGithub(ctx, gc, ak, sk, *p)
 	if err != nil {
 		return fmt.Errorf("updateSecrets(): %w", err)
 	}
