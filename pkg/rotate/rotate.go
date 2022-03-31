@@ -67,17 +67,6 @@ func New(
 	}
 }
 
-// ptrString is a clone of aws.String() for use with the github API. I suppose I
-// should just use aws.String(), but that feels wrong somehow. Does the github
-// Go SDK provide an analog? I'm too lazy to check.
-func ptrString(p *string) string {
-	if p != nil {
-		return *p
-	} else {
-		return ""
-	}
-}
-
 // updateProjectsWithSecrets compiles all the Project metadata for projects we
 // manage. It prepares the object for perforing rotations.
 func (r *Rotate) updateProjectsWithSecrets(ctx context.Context) error {
@@ -94,8 +83,8 @@ func (r *Rotate) updateProjectsWithSecrets(ctx context.Context) error {
 		}
 
 		for _, repo := range repos {
-			owner := ptrString(repo.Owner.Login)
-			repo := ptrString(repo.Name)
+			owner := github.Stringify(repo.Owner.Login)
+			repo := github.Stringify(repo.Name)
 			name := strings.Join([]string{owner, repo}, "/")
 			if _, configured := r.projects[name]; !configured {
 				continue
@@ -178,14 +167,14 @@ func updateSecrets(ctx context.Context, gc *github.Client, ak, sk string, p Proj
 		return fmt.Errorf("gc.Actions.GetRepoPublicKey(%q, %q): %w", p.Owner, p.Repo, err)
 	}
 
-	keyStr := ptrString(pubKey.Key)
+	keyStr := github.Stringify(pubKey.Key)
 	decKeyBytes, err := base64.StdEncoding.DecodeString(keyStr)
 	if err != nil {
 		return fmt.Errorf("base64.StdEncoding.DecodeString(): %w", err)
 	}
 	keyStr = string(decKeyBytes)
 
-	keyIDStr := ptrString(pubKey.KeyID)
+	keyIDStr := github.Stringify(pubKey.KeyID)
 
 	pkBox := sodium.BoxPublicKey{
 		Bytes: sodium.Bytes([]byte(keyStr)),
