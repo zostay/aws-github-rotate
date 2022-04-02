@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/iam"
 	"github.com/google/go-github/v42/github"
 	"github.com/jamesruan/sodium"
@@ -74,7 +73,7 @@ type Rotate struct {
 	rotateAfter time.Duration
 	dryRun      bool
 
-	projects map[string]*Project
+	Projects map[string]*Project
 }
 
 // New constructs a new object to perform password rotation.
@@ -97,7 +96,7 @@ func New(
 		svcIam:      svcIam,
 		rotateAfter: rotateAfter,
 		dryRun:      dryRun,
-		projects:    ps,
+		Projects:    ps,
 	}
 }
 
@@ -120,7 +119,7 @@ func (r *Rotate) refreshGithubState(ctx context.Context) error {
 			owner := github.Stringify(repo.Owner.Login)
 			repo := github.Stringify(repo.Name)
 			name := strings.Join([]string{owner, repo}, "/")
-			p, configured := r.projects[name]
+			p, configured := r.Projects[name]
 			if !configured {
 				continue
 			}
@@ -397,14 +396,14 @@ func (r *Rotate) RotateSecret(ctx context.Context, p *Project) error {
 	return nil
 }
 
-// rotateSecrets goes through all the projects, determines which have
+// RotateSecrets goes through all the projects, determines which have
 // outdated keys (i.e., they are older than maxAge) or a mismatch between IAM
 // information and github information and performs rotation on those services.
 // All github services should have working keys after this operation is
 // performed.
-func rotateSecrets(ctx context.Context, gc *github.Client, svcIam *iam.IAM, ps []Project) error {
-	for i := range ps {
-		err := rotateSecret(ctx, gc, svcIam, &ps[i])
+func (r *Rotate) RotateSecrets(ctx context.Context) error {
+	for i := range r.Projects {
+		err := r.RotateSecret(ctx, &ps[i])
 		if err != nil {
 			return fmt.Errorf("failed to rotate secret: %w", err)
 		}
@@ -413,11 +412,11 @@ func rotateSecrets(ctx context.Context, gc *github.Client, svcIam *iam.IAM, ps [
 	return nil
 }
 
-// disableSecret examines the given project to see if the oldestKey is older
+// DisableSecret examines the given project to see if the oldestKey is older
 // than the maxActiveAge. If it is older, then the key is disabled in IAM. If
 // not, then it is left alone.
-func disableSecret(ctx context.Context, svcIam *iam.IAM, p *Project) error {
-	okey, _, err := getAccessKeys(ctx, svcIam, p)
+func (r *Rotate) DisableSecret(ctx context.Context, p *Project) error {
+	okey, _, err := r.getAccessKeys(ctx, p)
 	if err != nil {
 		return fmt.Errorf("failed to retrieve key information: %w", err)
 	}
@@ -428,9 +427,9 @@ func disableSecret(ctx context.Context, svcIam *iam.IAM, p *Project) error {
 		return nil
 	}
 
-	fmt.Printf("Disabling old IAM account key for %s/%s\n", p.Owner, p.Repo)
+	fmt.Printf("Disabling old IAM account key for project %s\n", p.Name)
 
-	p.keysCached = false
+	p.ClearAWSKeyCache()
 	_, err = svcIam.UpdateAccessKey(&iam.UpdateAccessKeyInput{
 		AccessKeyId: okey.AccessKeyId,
 		Status:      aws.String(iam.StatusTypeInactive),
@@ -443,43 +442,15 @@ func disableSecret(ctx context.Context, svcIam *iam.IAM, p *Project) error {
 	return nil
 }
 
-// disableOldSecrets examines all the IAM keys and disables any of the
+// DisableOldSecrets examines all the IAM keys and disables any of the
 // non-active keys that have surpassed the maxActiveAge.
-func disableOldSecrets(ctx context.Context, svcIam *iam.IAM, ps []Project) error {
-	for i := range ps {
-		err := disableSecret(ctx, svcIam, &ps[i])
+func DisableOldSecrets(ctx context.Context) error {
+	for i := range r.Projects {
+		err := r.DisableSecret(ctx, &ps[i])
 		if err != nil {
 			return fmt.Errorf("failed to disable secret: %w", err)
 		}
 	}
 
 	return nil
-}
-
-func main() {
-	githubAccessToken = os.Getenv("GITHUB_ACCESS_TOKEN")
-
-	ctx := context.Background()
-	gc, err := githubClient(ctx, githubAccessToken)
-	if err != nil {
-		panic(fmt.Sprintf("unable to authorize with github: %v", err))
-	}
-
-	ps, err := listReposWithSecrets(ctx, gc)
-	if err != nil {
-		panic(fmt.Sprintf("unable list repositories with secrets: %v", err))
-	}
-
-	session := session.Must(session.NewSession())
-	svcIam := iam.New(session)
-
-	err = rotateSecrets(ctx, gc, svcIam, ps)
-	if err != nil {
-		panic(fmt.Sprintf("unable to rotate secrets: %v", err))
-	}
-
-	err = disableOldSecrets(ctx, svcIam, ps)
-	if err != nil {
-		panic(fmt.Sprintf("unable to disable expired secrets: %v", err))
-	}
 }
