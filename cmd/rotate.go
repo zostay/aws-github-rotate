@@ -28,13 +28,13 @@ func initRotateCmd() {
 
 // githubClient connects to the github API client and returns it or returns an
 // error.
-func githubClient(ctx context.Context, gat string) (*github.Client, error) {
+func githubClient(ctx context.Context, gat string) *github.Client {
 	ts := oauth2.StaticTokenSource(
-		&oauth2.Token{AccessToken: githubAccessToken},
+		&oauth2.Token{AccessToken: gat},
 	)
 	oc := oauth2.NewClient(ctx, ts)
 	client := github.NewClient(oc)
-	return client, nil
+	return client
 }
 
 func RunRotation(cmd *cobra.Command, args []string) {
@@ -46,7 +46,7 @@ func RunRotation(cmd *cobra.Command, args []string) {
 	session := session.Must(session.NewSession())
 	svcIam := iam.New(session)
 
-	r := rotate.New(gc, svcIam, c.RotateAfter, dryRun, c.ProjectMap())
+	r := rotate.New(gc, svcIam, c.RotateAfter, c.DisableAfter, dryRun, c.ProjectMap())
 
 	r.RotateSecrets(ctx)
 	r.DisableSecrets(ctx)

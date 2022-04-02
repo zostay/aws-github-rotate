@@ -69,10 +69,11 @@ func (p *Project) SetAWSKeyCache(o, n *iam.AccessKeyMetadata) {
 // related to github objects and then update the related action secrets.
 type Rotate struct {
 	gc     *github.Client
-	iamSvc *iam.IAM
+	svcIam *iam.IAM
 
-	rotateAfter time.Duration
-	dryRun      bool
+	rotateAfter  time.Duration
+	disableAfter time.Duration
+	dryRun       bool
 
 	Projects map[string]*Project
 }
@@ -82,6 +83,7 @@ func New(
 	gc *github.Client,
 	svcIam *iam.IAM,
 	rotateAfter time.Duration,
+	disableAfter time.Duration,
 	dryRun bool,
 	projectMap map[string]*config.Project,
 ) *Rotate {
@@ -93,11 +95,12 @@ func New(
 	}
 
 	return &Rotate{
-		gc:          gc,
-		svcIam:      svcIam,
-		rotateAfter: rotateAfter,
-		dryRun:      dryRun,
-		Projects:    ps,
+		gc:           gc,
+		svcIam:       svcIam,
+		rotateAfter:  rotateAfter,
+		disableAfter: disableAfter,
+		dryRun:       dryRun,
+		Projects:     ps,
 	}
 }
 
@@ -126,7 +129,7 @@ func (r *Rotate) refreshGithubState(ctx context.Context) error {
 			}
 
 			//fmt.Printf("Try %s/%s\n", owner, name)
-			secrets, _, err := gc.Actions.ListRepoSecrets(ctx, owner, name, nil)
+			secrets, _, err := r.gc.Actions.ListRepoSecrets(ctx, owner, name, nil)
 			if err != nil {
 				// assume this is a 403 not admin error and try the next
 				continue
@@ -142,11 +145,11 @@ func (r *Rotate) refreshGithubState(ctx context.Context) error {
 			}
 			for _, secret := range secrets.Secrets {
 				//fmt.Printf("name = %q\n", secret.Name)
-				if secret.Name == githubAccessKeyKey {
+				if secret.Name == p.AccessKey {
 					ak = true
 					recordEarliestUpdateDate(secret.UpdatedAt.Time)
 				}
-				if secret.Name == githubSecretKeyKey {
+				if secret.Name == p.SecretKey {
 					sk = true
 					recordEarliestUpdateDate(secret.UpdatedAt.Time)
 				}
@@ -156,21 +159,13 @@ func (r *Rotate) refreshGithubState(ctx context.Context) error {
 			}
 
 			if ak && sk {
-				if user, ok := iamUsers[strings.Join([]string{owner, name}, "/")]; ok {
-					p.SecretUpdatedAt = updated
-				} else {
-					fmt.Fprintf(
-						os.Stderr,
-						"WARNING: project %s/%s has an AWS identity, but is not configured for rotation\n",
-						owner, name,
-					)
-				}
+				p.SecretUpdatedAt = updated
 			} else if ak || sk {
 				fmt.Fprintf(
 					os.Stderr,
 					"WARNING: project %s/%s is missing %q or %q in action secrets\n",
 					owner, name,
-					githubAccessKeyKey, githubSecretKeyKey,
+					p.AccessKey, p.SecretKey,
 				)
 			}
 		}
@@ -188,7 +183,7 @@ func (r *Rotate) refreshGithubState(ctx context.Context) error {
 
 // UpdateGithub will replace the github action secrets with newly minted values.
 func (r *Rotate) UpdateGithub(ctx context.Context, ak, sk string, p *Project) error {
-	pubKey, _, err := gc.Actions.GetRepoPublicKey(ctx, p.Owner(), p.Repo())
+	pubKey, _, err := r.gc.Actions.GetRepoPublicKey(ctx, p.Owner(), p.Repo())
 	if err != nil {
 		return fmt.Errorf("gc.Actions.GetRepoPublicKey(%q, %q): %w", p.Owner, p.Repo, err)
 	}
@@ -214,25 +209,25 @@ func (r *Rotate) UpdateGithub(ctx context.Context, ak, sk string, p *Project) er
 	skSealed := skBox.SealedBox(pkBox)
 	skEncSealed := base64.StdEncoding.EncodeToString(skSealed)
 
-	if !dryRun {
+	if !r.dryRun {
 		akEncSec := &github.EncryptedSecret{
-			Name:           githubAccessKeyKey,
+			Name:           p.AccessKey,
 			KeyID:          keyIDStr,
 			EncryptedValue: akEncSealed,
 		}
-		_, err = gc.Actions.CreateOrUpdateRepoSecret(ctx, p.Owner, p.Repo, akEncSec)
+		_, err = r.gc.Actions.CreateOrUpdateRepoSecret(ctx, p.Owner(), p.Repo(), akEncSec)
 		if err != nil {
-			return fmt.Errorf("gc.Actions.CreateOrUpdateRepoSecret(%q, %q, %q): %w", p.Owner, p.Repo, githubAccessKeyKey, err)
+			return fmt.Errorf("gc.Actions.CreateOrUpdateRepoSecret(%q, %q, %q): %w", p.Owner(), p.Repo(), p.AccessKey, err)
 		}
 
 		skEncSec := &github.EncryptedSecret{
-			Name:           githubSecretKeyKey,
+			Name:           p.SecretKey,
 			KeyID:          keyIDStr,
 			EncryptedValue: skEncSealed,
 		}
-		_, err = gc.Actions.CreateOrUpdateRepoSecret(ctx, p.Owner, p.Repo, skEncSec)
+		_, err = r.gc.Actions.CreateOrUpdateRepoSecret(ctx, p.Owner(), p.Repo(), skEncSec)
 		if err != nil {
-			return fmt.Errorf("gc.Actions.CreateOrUpdateRepoSecret(%q, %q, %q): %w", p.Owner, p.Repo, githubAccessKeyKey, err)
+			return fmt.Errorf("gc.Actions.CreateOrUpdateRepoSecret(%q, %q, %q): %w", p.Owner(), p.Repo(), p.SecretKey, err)
 		}
 
 		p.TouchGithub()
@@ -264,7 +259,7 @@ func (r *Rotate) getAccessKeys(ctx context.Context, p *Project) (*iam.AccessKeyM
 		return o, n, nil
 	}
 
-	ak, err := svcIam.ListAccessKeys(&iam.ListAccessKeysInput{
+	ak, err := r.svcIam.ListAccessKeys(&iam.ListAccessKeysInput{
 		UserName: aws.String(p.User),
 	})
 	if err != nil {
@@ -321,9 +316,9 @@ func (r *Rotate) rotateAWSSecret(ctx context.Context, p *Project) (string, strin
 	}
 
 	if oldKey != nil && oak != nak {
-		if !dryRun {
+		if !r.dryRun {
 			p.ClearAWSKeyCache()
-			_, err := svcIam.DeleteAccessKey(&iam.DeleteAccessKeyInput{
+			_, err := r.svcIam.DeleteAccessKey(&iam.DeleteAccessKeyInput{
 				UserName:    aws.String(p.User),
 				AccessKeyId: oldKey.AccessKeyId,
 			})
@@ -334,9 +329,9 @@ func (r *Rotate) rotateAWSSecret(ctx context.Context, p *Project) (string, strin
 	}
 
 	var accessKey, secretKey string
-	if !dryRun {
+	if !r.dryRun {
 		p.keysCached = false
-		ck, err := svcIam.CreateAccessKey(&iam.CreateAccessKeyInput{
+		ck, err := r.svcIam.CreateAccessKey(&iam.CreateAccessKeyInput{
 			UserName: aws.String(p.User),
 		})
 		if err != nil {
@@ -356,7 +351,7 @@ func (r *Rotate) rotateAWSSecret(ctx context.Context, p *Project) (string, strin
 // needsRotation returns true if the named secret requires rotation.
 func (r *Rotate) NeedsRotation(ctx context.Context, p *Project) (bool, error) {
 	// is github action secret too old?
-	needsRotation := time.Since(p.SecretUpdatedAt) > maxAge
+	needsRotation := time.Since(p.SecretUpdatedAt) > r.rotateAfter
 
 	// Even if the github secret is new, it may be the the github action secret
 	// is older than the current IAM secret. Let's check.
@@ -384,12 +379,12 @@ func (r *Rotate) RotateSecret(ctx context.Context, p *Project) error {
 		return nil
 	}
 
-	ak, sk, err := r.RotateAWSSecret(ctx, p)
+	ak, sk, err := r.rotateAWSSecret(ctx, p)
 	if err != nil {
 		return fmt.Errorf("rotateSecretIam(): %w", err)
 	}
 
-	err = r.UpdateGithub(ctx, gc, ak, sk, *p)
+	err = r.UpdateGithub(ctx, ak, sk, p)
 	if err != nil {
 		return fmt.Errorf("updateSecrets(): %w", err)
 	}
@@ -403,8 +398,8 @@ func (r *Rotate) RotateSecret(ctx context.Context, p *Project) error {
 // All github services should have working keys after this operation is
 // performed.
 func (r *Rotate) RotateSecrets(ctx context.Context) error {
-	for i := range r.Projects {
-		err := r.RotateSecret(ctx, &ps[i])
+	for k := range r.Projects {
+		err := r.RotateSecret(ctx, r.Projects[k])
 		if err != nil {
 			return fmt.Errorf("failed to rotate secret: %w", err)
 		}
@@ -413,17 +408,17 @@ func (r *Rotate) RotateSecrets(ctx context.Context) error {
 	return nil
 }
 
-// DisableSecret examines the given project to see if the oldestKey is older
-// than the maxActiveAge. If it is older, then the key is disabled in IAM. If
-// not, then it is left alone.
-func (r *Rotate) DisableSecret(ctx context.Context, p *Project) error {
+// disableAWSSecret examines the given project to see if the oldestKey is older
+// than the DisableAfter time. If it is older, then the key is disabled in IAM.
+// If not, then it is left alone.
+func (r *Rotate) disableAWSSecret(ctx context.Context, p *Project) error {
 	okey, _, err := r.getAccessKeys(ctx, p)
 	if err != nil {
 		return fmt.Errorf("failed to retrieve key information: %w", err)
 	}
 
 	createDate := aws.TimeValue(okey.CreateDate)
-	needsDisabled := time.Since(createDate) > maxActiveAge
+	needsDisabled := time.Since(createDate) > r.disableAfter
 	if !needsDisabled {
 		return nil
 	}
@@ -431,7 +426,7 @@ func (r *Rotate) DisableSecret(ctx context.Context, p *Project) error {
 	fmt.Printf("Disabling old IAM account key for project %s\n", p.Name)
 
 	p.ClearAWSKeyCache()
-	_, err = svcIam.UpdateAccessKey(&iam.UpdateAccessKeyInput{
+	_, err = r.svcIam.UpdateAccessKey(&iam.UpdateAccessKeyInput{
 		AccessKeyId: okey.AccessKeyId,
 		Status:      aws.String(iam.StatusTypeInactive),
 		UserName:    aws.String(p.User),
@@ -445,9 +440,9 @@ func (r *Rotate) DisableSecret(ctx context.Context, p *Project) error {
 
 // DisableOldSecrets examines all the IAM keys and disables any of the
 // non-active keys that have surpassed the maxActiveAge.
-func DisableOldSecrets(ctx context.Context) error {
-	for i := range r.Projects {
-		err := r.DisableSecret(ctx, &ps[i])
+func (r *Rotate) DisableOldSecrets(ctx context.Context) error {
+	for k := range r.Projects {
+		err := r.disableAWSSecret(ctx, r.Projects[k])
 		if err != nil {
 			return fmt.Errorf("failed to disable secret: %w", err)
 		}

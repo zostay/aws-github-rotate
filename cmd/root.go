@@ -30,5 +30,5 @@ func Execute() {
 	githubToken = os.Getenv("GITHUB_TOKEN")
 
 	err := rootCmd.Execute()
-	cmd.CheckErr(err)
+	cobra.CheckErr(err)
 }
