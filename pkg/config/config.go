@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -42,7 +43,7 @@ type Config struct {
 // This will return an error if the configuration is found to be invalid for
 // soem reason. Returns nil on success.
 func (c *Config) Prepare() error {
-	pm := make(map[string]Project, len(c.Projects))
+	pm := make(map[string]*Project, len(c.Projects))
 
 	for i := range c.Projects {
 		if _, alreadyExists := pm[c.Projects[i].Name]; alreadyExists {
@@ -67,12 +68,12 @@ func (c *Config) Prepare() error {
 
 // Repo is the repository part of the Name.
 func (p Project) Repo() string {
-	_, name, _ := p.Cut(p.Name, "/")
+	_, name, _ := strings.Cut(p.Name, "/")
 	return name
 }
 
 // Owner is the organization/user part of the Name.
 func (p Project) Owner() string {
-	repo, _, _ := p.Cut(p.Name, "/")
+	repo, _, _ := strings.Cut(p.Name, "/")
 	return repo
 }
