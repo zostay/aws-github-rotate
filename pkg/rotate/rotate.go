@@ -13,7 +13,8 @@ import (
 	"github.com/aws/aws-sdk-go/service/iam"
 	"github.com/google/go-github/v42/github"
 	"github.com/jamesruan/sodium"
-	"github.com/zostay/aws-github-rotate/internal/config"
+
+	"github.com/zostay/aws-github-rotate/pkg/config"
 )
 
 // Project is the compiled metadata about each project for which we manage the

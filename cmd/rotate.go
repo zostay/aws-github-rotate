@@ -11,7 +11,7 @@ import (
 	"github.com/spf13/cobra"
 	"golang.org/x/oauth2"
 
-	"github.com/zostay/internal/rotate"
+	"github.com/zostay/aws-github-rotate/pkg/rotate"
 )
 
 var rotateCmd *cobra.Command
