@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"fmt"
 	"os"
 	"time"
 
@@ -17,6 +18,8 @@ const (
 var (
 	rootCmd *cobra.Command
 	c       config.Config
+	cfgFile string
+	dryRun  bool
 )
 
 func init() {
@@ -42,12 +45,17 @@ func init() {
 	viper.BindPFlag("defaultAccessKey", rootCmd.PersistentFlags().Lookup("access-key"))
 	viper.BindPFlag("defaultSecretKey", rootCmd.PersistentFlags().Lookup("secret-key"))
 
-	viper.SetDefault("rotateAfter", 168*time.Duration)
-	viper.SetDefault("disableAfter", 48*time.Duration)
+	viper.SetDefault("rotateAfter", 168*time.Hour)
+	viper.SetDefault("disableAfter", 48*time.Hour)
 	viper.SetDefault("defaultAccessKey", DefaultAccessKey)
 	viper.SetDefault("defaultSecretKey", DefaultSecretKey)
 
 	initRotateCmd()
+}
+
+func fatalf(f string, args ...any) {
+	fmt.Fprintf(os.Stderr, f, args...)
+	os.Exit(1)
 }
 
 func initConfig() {
@@ -63,18 +71,16 @@ func initConfig() {
 
 	err := viper.ReadInConfig()
 	if err != nil {
-		panic("unable to read configuration: %v", err)
+		fatalf("unable to read configuration: %v", err)
 	}
 
 	err = viper.Unmarshal(&c)
 	if err != nil {
-		panic("unable to unmarshal configuration: %v", err)
+		fatalf("unable to unmarshal configuration: %v", err)
 	}
 }
 
 func Execute() {
-	githubToken = os.Getenv("GITHUB_TOKEN")
-
 	err := rootCmd.Execute()
 	cobra.CheckErr(err)
 }

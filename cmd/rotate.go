@@ -2,12 +2,11 @@ package cmd
 
 import (
 	"context"
-	"fmt"
 	"os"
 
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/iam"
-	"github.com/google/go-github/github"
+	"github.com/google/go-github/v42/github"
 	"github.com/spf13/cobra"
 	"golang.org/x/oauth2"
 
@@ -38,27 +37,22 @@ func githubClient(ctx context.Context, gat string) *github.Client {
 }
 
 func RunRotation(cmd *cobra.Command, args []string) {
-	githubToken = os.Getenv("GITHUB_TOKEN")
+	c.GithubToken = os.Getenv("GITHUB_TOKEN")
 
 	ctx := context.Background()
-	gc := githubClient(ctx, githubToken)
+	gc := githubClient(ctx, c.GithubToken)
 
 	session := session.Must(session.NewSession())
 	svcIam := iam.New(session)
 
-	r := rotate.New(gc, svcIam, c.RotateAfter, c.DisableAfter, dryRun, c.ProjectMap())
+	r := rotate.New(gc, svcIam, c.RotateAfter, c.DisableAfter, dryRun, c.ProjectMap)
 
 	r.RotateSecrets(ctx)
-	r.DisableSecrets(ctx)
-
-	gc, err := githubClient(ctx, githubAccessToken)
-	if err != nil {
-		panic(fmt.Sprintf("unable to authorize with github: %v", err))
-	}
+	r.DisableOldSecrets(ctx)
 
 	ps, err := listReposWithSecrets(ctx, gc)
 	if err != nil {
-		panic(fmt.Sprintf("unable list repositories with secrets: %v", err))
+		fatalf("unable list repositories with secrets: %v", err)
 	}
 
 	session := session.Must(session.NewSession())
@@ -66,11 +60,11 @@ func RunRotation(cmd *cobra.Command, args []string) {
 
 	err = rotateSecrets(ctx, gc, svcIam, ps)
 	if err != nil {
-		panic(fmt.Sprintf("unable to rotate secrets: %v", err))
+		fatalf("unable to rotate secrets: %v", err)
 	}
 
 	err = disableOldSecrets(ctx, svcIam, ps)
 	if err != nil {
-		panic(fmt.Sprintf("unable to disable expired secrets: %v", err))
+		fatalf("unable to disable expired secrets: %v", err)
 	}
 }
