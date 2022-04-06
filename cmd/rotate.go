@@ -47,24 +47,13 @@ func RunRotation(cmd *cobra.Command, args []string) {
 
 	r := rotate.New(gc, svcIam, c.RotateAfter, c.DisableAfter, dryRun, c.ProjectMap)
 
-	r.RotateSecrets(ctx)
-	r.DisableOldSecrets(ctx)
-
-	ps, err := listReposWithSecrets(ctx, gc)
+	err := r.RotateSecrets(ctx)
 	if err != nil {
-		fatalf("unable list repositories with secrets: %v", err)
+		fatalf("%v", err)
 	}
 
-	session := session.Must(session.NewSession())
-	svcIam := iam.New(session)
-
-	err = rotateSecrets(ctx, gc, svcIam, ps)
+	err = r.DisableOldSecrets(ctx)
 	if err != nil {
-		fatalf("unable to rotate secrets: %v", err)
-	}
-
-	err = disableOldSecrets(ctx, svcIam, ps)
-	if err != nil {
-		fatalf("unable to disable expired secrets: %v", err)
+		fatalf("%v", err)
 	}
 }
