@@ -34,10 +34,10 @@ func init() {
 	viper.SetDefault("DisableAfter", 48*time.Hour)
 
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config-file", "", "config file (default is /aws-github-rotate.yaml)")
-	rootCmd.PersistentFlags().Duration("rotate-after", 168*time.Hour, "keys older than rotate-age will be rotated")
-	rootCmd.PersistentFlags().Duration("disable-after", 48*time.Hour, "keys older than rotate-age + active-age will be disabled")
-	rootCmd.PersistentFlags().String("access-key", DefaultAccessKey, "set the default access key to use to store the github action access key")
-	rootCmd.PersistentFlags().String("secret-key", DefaultSecretKey, "set the default secret key to use to store the github action secret key")
+	rootCmd.PersistentFlags().Duration("rotate-after", 168*time.Hour, "keys older than rotate-after will be rotated")
+	rootCmd.PersistentFlags().Duration("disable-after", 48*time.Hour, "keys older than rotate-after + disable-after will be disabled")
+	rootCmd.PersistentFlags().String("access-key", DefaultAccessKey, "set the default key to use to store the access key in github")
+	rootCmd.PersistentFlags().String("secret-key", DefaultSecretKey, "set the default key to use to store the secret key in github")
 	rootCmd.PersistentFlags().BoolVar(&dryRun, "dry-run", false, "a dry-run describes what would happen without doing it")
 
 	viper.BindPFlag("rotateAfter", rootCmd.PersistentFlags().Lookup("rotate-after"))
@@ -51,6 +51,7 @@ func init() {
 	viper.SetDefault("defaultSecretKey", DefaultSecretKey)
 
 	initRotateCmd()
+	initDisableCmd()
 }
 
 func fatalf(f string, args ...any) {

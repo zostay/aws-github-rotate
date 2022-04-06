@@ -4,36 +4,26 @@ import (
 	"context"
 	"os"
 
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/iam"
-	"github.com/google/go-github/v42/github"
 	"github.com/spf13/cobra"
-	"golang.org/x/oauth2"
 
 	"github.com/zostay/aws-github-rotate/pkg/rotate"
 )
 
-var rotateCmd *cobra.Command
+var (
+	rotateCmd   *cobra.Command
+	alsoDisable bool
+)
 
 func initRotateCmd() {
 	rotateCmd = &cobra.Command{
 		Use:   "rotate",
-		Short: "rotate an AWS password and update a github aciton secret",
+		Short: "rotate an AWS IAM key/secret pair and update a github action secret",
 		Run:   RunRotation,
 	}
 
-	rootCmd.AddCommand(rotateCmd)
-}
+	rotateCmd.Flags().BoolVar(&alsoDisable, "also-disable", false, "after rotating keys, check for any old access keys that should be disabled")
 
-// githubClient connects to the github API client and returns it or returns an
-// error.
-func githubClient(ctx context.Context, gat string) *github.Client {
-	ts := oauth2.StaticTokenSource(
-		&oauth2.Token{AccessToken: gat},
-	)
-	oc := oauth2.NewClient(ctx, ts)
-	client := github.NewClient(oc)
-	return client
+	rootCmd.AddCommand(rotateCmd)
 }
 
 func RunRotation(cmd *cobra.Command, args []string) {
@@ -41,9 +31,7 @@ func RunRotation(cmd *cobra.Command, args []string) {
 
 	ctx := context.Background()
 	gc := githubClient(ctx, c.GithubToken)
-
-	session := session.Must(session.NewSession())
-	svcIam := iam.New(session)
+	svcIam := iamClient(ctx)
 
 	r := rotate.New(gc, svcIam, c.RotateAfter, c.DisableAfter, dryRun, c.ProjectMap)
 
@@ -52,8 +40,10 @@ func RunRotation(cmd *cobra.Command, args []string) {
 		fatalf("%v", err)
 	}
 
-	err = r.DisableOldSecrets(ctx)
-	if err != nil {
-		fatalf("%v", err)
+	if alsoDisable {
+		err = r.DisableOldSecrets(ctx)
+		if err != nil {
+			fatalf("%v", err)
+		}
 	}
 }
