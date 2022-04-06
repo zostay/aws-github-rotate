@@ -1,6 +1,6 @@
 module github.com/zostay/aws-github-rotate
 
-go 1.17
+go 1.18
 
 require (
 	github.com/aws/aws-sdk-go v1.43.9
