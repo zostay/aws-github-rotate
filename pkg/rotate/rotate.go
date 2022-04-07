@@ -123,8 +123,8 @@ func (r *Rotate) RefreshGithubState(ctx context.Context) error {
 		}
 
 		for _, repo := range repos {
-			owner := github.Stringify(repo.Owner.Login)
-			repo := github.Stringify(repo.Name)
+			owner := repo.Owner.GetLogin()
+			repo := repo.GetName()
 			name := strings.Join([]string{owner, repo}, "/")
 			p, configured := r.Projects[name]
 			if !configured {
@@ -414,6 +414,9 @@ func (r *Rotate) rotateSecret(ctx context.Context, p *Project) error {
 // performed.
 func (r *Rotate) RotateSecrets(ctx context.Context) error {
 	for k := range r.Projects {
+		if r.verbose {
+			fmt.Printf("Consider for rotation, project %s\n", r.Projects[k].Name)
+		}
 		err := r.rotateSecret(ctx, r.Projects[k])
 		if err != nil {
 			return fmt.Errorf("failed to rotate secret: %w", err)
@@ -460,6 +463,9 @@ func (r *Rotate) disableAWSSecret(ctx context.Context, p *Project) error {
 // non-active keys that have surpassed the maxActiveAge.
 func (r *Rotate) DisableOldSecrets(ctx context.Context) error {
 	for k := range r.Projects {
+		if r.verbose {
+			fmt.Printf("Consider for disablement, project %s\n", r.Projects[k].Name)
+		}
 		err := r.disableAWSSecret(ctx, r.Projects[k])
 		if err != nil {
 			return fmt.Errorf("failed to disable secret: %w", err)
