@@ -20,6 +20,7 @@ var (
 	c       config.Config
 	cfgFile string
 	dryRun  bool
+	verbose bool
 )
 
 func init() {
@@ -39,6 +40,7 @@ func init() {
 	rootCmd.PersistentFlags().String("access-key", DefaultAccessKey, "set the default key to use to store the access key in github")
 	rootCmd.PersistentFlags().String("secret-key", DefaultSecretKey, "set the default key to use to store the secret key in github")
 	rootCmd.PersistentFlags().BoolVar(&dryRun, "dry-run", false, "a dry-run describes what would happen without doing it")
+	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "more verbose logging")
 
 	viper.BindPFlag("rotateAfter", rootCmd.PersistentFlags().Lookup("rotate-after"))
 	viper.BindPFlag("disableAfter", rootCmd.PersistentFlags().Lookup("disable-after"))
@@ -79,6 +81,10 @@ func initConfig() {
 	if err != nil {
 		fatalf("unable to unmarshal configuration: %v", err)
 	}
+
+	// if verbose {
+	// 	fmt.Printf("%+v\n", c)
+	// }
 }
 
 func Execute() {

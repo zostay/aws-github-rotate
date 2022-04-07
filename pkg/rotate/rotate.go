@@ -74,6 +74,7 @@ type Rotate struct {
 	rotateAfter  time.Duration
 	disableAfter time.Duration
 	dryRun       bool
+	verbose      bool
 
 	Projects map[string]*Project
 }
@@ -85,6 +86,7 @@ func New(
 	rotateAfter time.Duration,
 	disableAfter time.Duration,
 	dryRun bool,
+	verbose bool,
 	projectMap map[string]*config.Project,
 ) *Rotate {
 	ps := make(map[string]*Project, len(projectMap))
@@ -100,13 +102,14 @@ func New(
 		rotateAfter:  rotateAfter,
 		disableAfter: disableAfter,
 		dryRun:       dryRun,
+		verbose:      verbose,
 		Projects:     ps,
 	}
 }
 
-// refreshGithubState compiles all the Project metadata for projects we manage.
+// RefreshGithubState compiles all the Project metadata for projects we manage.
 // It prepares the object for perforing rotations.
-func (r *Rotate) refreshGithubState(ctx context.Context) error {
+func (r *Rotate) RefreshGithubState(ctx context.Context) error {
 	nextPage := 1
 	for {
 		opt := &github.RepositoryListOptions{
@@ -126,6 +129,10 @@ func (r *Rotate) refreshGithubState(ctx context.Context) error {
 			p, configured := r.Projects[name]
 			if !configured {
 				continue
+			}
+
+			if r.verbose {
+				fmt.Printf("Checking state of project %s\n", name)
 			}
 
 			//fmt.Printf("Try %s/%s\n", owner, name)
@@ -181,8 +188,8 @@ func (r *Rotate) refreshGithubState(ctx context.Context) error {
 	return nil
 }
 
-// UpdateGithub will replace the github action secrets with newly minted values.
-func (r *Rotate) UpdateGithub(ctx context.Context, ak, sk string, p *Project) error {
+// updateGithub will replace the github action secrets with newly minted values.
+func (r *Rotate) updateGithub(ctx context.Context, ak, sk string, p *Project) error {
 	pubKey, _, err := r.gc.Actions.GetRepoPublicKey(ctx, p.Owner(), p.Repo())
 	if err != nil {
 		return fmt.Errorf("gc.Actions.GetRepoPublicKey(%q, %q): %w", p.Owner, p.Repo, err)
@@ -208,6 +215,11 @@ func (r *Rotate) UpdateGithub(ctx context.Context, ak, sk string, p *Project) er
 	skBox := sodium.Bytes([]byte(sk))
 	skSealed := skBox.SealedBox(pkBox)
 	skEncSealed := base64.StdEncoding.EncodeToString(skSealed)
+
+	if r.verbose {
+		fmt.Printf(" - updating github action secret %q", p.AccessKey)
+		fmt.Printf(" - updating github action secret %q", p.SecretKey)
+	}
 
 	if !r.dryRun {
 		akEncSec := &github.EncryptedSecret{
@@ -300,7 +312,10 @@ func examineKeys(akmds []*iam.AccessKeyMetadata) (*iam.AccessKeyMetadata, *iam.A
 // two nils and an error or the newly minted access key and secret key and no
 // error.
 func (r *Rotate) rotateAWSSecret(ctx context.Context, p *Project) (string, string, error) {
-	fmt.Printf("Rotating IAM account for %s/%s\n", p.Owner(), p.Repo())
+	if r.verbose {
+		fmt.Print(" - ")
+	}
+	fmt.Printf("rotating IAM account for %s\n", p.Name)
 
 	oldKey, newKey, err := r.getAccessKeys(ctx, p)
 	if err != nil {
@@ -369,9 +384,9 @@ func (r *Rotate) NeedsRotation(ctx context.Context, p *Project) (bool, error) {
 	return needsRotation, nil
 }
 
-// RotateSecret rotates a single project's secret in IAM and then updates the
+// rotateSecret rotates a single project's secret in IAM and then updates the
 // github action secret keys with the newly minted access key and secret key.
-func (r *Rotate) RotateSecret(ctx context.Context, p *Project) error {
+func (r *Rotate) rotateSecret(ctx context.Context, p *Project) error {
 	needed, err := r.NeedsRotation(ctx, p)
 	if err != nil {
 		return err
@@ -384,7 +399,7 @@ func (r *Rotate) RotateSecret(ctx context.Context, p *Project) error {
 		return fmt.Errorf("rotateSecretIam(): %w", err)
 	}
 
-	err = r.UpdateGithub(ctx, ak, sk, p)
+	err = r.updateGithub(ctx, ak, sk, p)
 	if err != nil {
 		return fmt.Errorf("updateSecrets(): %w", err)
 	}
@@ -399,7 +414,7 @@ func (r *Rotate) RotateSecret(ctx context.Context, p *Project) error {
 // performed.
 func (r *Rotate) RotateSecrets(ctx context.Context) error {
 	for k := range r.Projects {
-		err := r.RotateSecret(ctx, r.Projects[k])
+		err := r.rotateSecret(ctx, r.Projects[k])
 		if err != nil {
 			return fmt.Errorf("failed to rotate secret: %w", err)
 		}
@@ -423,7 +438,10 @@ func (r *Rotate) disableAWSSecret(ctx context.Context, p *Project) error {
 		return nil
 	}
 
-	fmt.Printf("Disabling old IAM account key for project %s\n", p.Name)
+	if r.verbose {
+		fmt.Print(" - ")
+	}
+	fmt.Printf("disabling old IAM account key for project %s\n", p.Name)
 
 	p.ClearAWSKeyCache()
 	_, err = r.svcIam.UpdateAccessKey(&iam.UpdateAccessKeyInput{

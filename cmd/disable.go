@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"context"
-	"os"
 
 	"github.com/spf13/cobra"
 	"github.com/zostay/aws-github-rotate/pkg/rotate"
@@ -23,15 +22,23 @@ func initDisableCmd() {
 }
 
 func RunDisable(cmd *cobra.Command, args []string) {
-	c.GithubToken = os.Getenv("GITHUB_TOKEN")
-
 	ctx := context.Background()
 	gc := githubClient(ctx, c.GithubToken)
 	svcIam := iamClient(ctx)
 
-	r := rotate.New(gc, svcIam, c.RotateAfter, c.DisableAfter, dryRun, c.ProjectMap)
+	r := rotate.New(
+		gc, svcIam,
+		c.RotateAfter, c.DisableAfter,
+		dryRun, verbose,
+		c.ProjectMap,
+	)
 
-	err := r.DisableOldSecrets(ctx)
+	err := r.RefreshGithubState(ctx)
+	if err != nil {
+		fatalf("%v", err)
+	}
+
+	err = r.DisableOldSecrets(ctx)
 	if err != nil {
 		fatalf("%v", err)
 	}
