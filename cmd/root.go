@@ -83,6 +83,11 @@ func initConfig() {
 		fatalf("unable to unmarshal configuration: %v", err)
 	}
 
+	err = c.Prepare()
+	if err != nil {
+		fatalf("unable to finish processing configuration: %v", err)
+	}
+
 	// if verbose {
 	// 	fmt.Printf("%+v\n", c)
 	// }
