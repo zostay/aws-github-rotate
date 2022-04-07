@@ -195,14 +195,14 @@ func (r *Rotate) updateGithub(ctx context.Context, ak, sk string, p *Project) er
 		return fmt.Errorf("gc.Actions.GetRepoPublicKey(%q, %q): %w", p.Owner, p.Repo, err)
 	}
 
-	keyStr := github.Stringify(pubKey.Key)
+	keyStr := pubKey.GetKey()
 	decKeyBytes, err := base64.StdEncoding.DecodeString(keyStr)
 	if err != nil {
 		return fmt.Errorf("base64.StdEncoding.DecodeString(): %w", err)
 	}
 	keyStr = string(decKeyBytes)
 
-	keyIDStr := github.Stringify(pubKey.KeyID)
+	keyIDStr := pubKey.GetKeyID()
 
 	pkBox := sodium.BoxPublicKey{
 		Bytes: sodium.Bytes([]byte(keyStr)),
@@ -217,8 +217,8 @@ func (r *Rotate) updateGithub(ctx context.Context, ak, sk string, p *Project) er
 	skEncSealed := base64.StdEncoding.EncodeToString(skSealed)
 
 	if r.verbose {
-		fmt.Printf(" - updating github action secret %q", p.AccessKey)
-		fmt.Printf(" - updating github action secret %q", p.SecretKey)
+		fmt.Printf(" - updating github action secret %q\n", p.AccessKey)
+		fmt.Printf(" - updating github action secret %q\n", p.SecretKey)
 	}
 
 	if !r.dryRun {
