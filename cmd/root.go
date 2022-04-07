@@ -47,6 +47,7 @@ func init() {
 	viper.BindPFlag("defaultAccessKey", rootCmd.PersistentFlags().Lookup("access-key"))
 	viper.BindPFlag("defaultSecretKey", rootCmd.PersistentFlags().Lookup("secret-key"))
 
+	viper.BindEnv("githubToken", "GITHUB_TOKEN")
 	viper.SetDefault("rotateAfter", 168*time.Hour)
 	viper.SetDefault("disableAfter", 48*time.Hour)
 	viper.SetDefault("defaultAccessKey", DefaultAccessKey)
