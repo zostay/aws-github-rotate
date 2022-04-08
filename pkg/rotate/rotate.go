@@ -368,6 +368,10 @@ func (r *Rotate) NeedsRotation(ctx context.Context, p *Project) (bool, error) {
 	// is github action secret too old?
 	needsRotation := time.Since(p.SecretUpdatedAt) > r.rotateAfter
 
+	if r.verbose && needsRotation {
+		fmt.Printf(" - Secret updated %v has not been updated in more than %v\n", p.SecretUpdatedAt, r.rotateAfter)
+	}
+
 	// Even if the github secret is new, it may be the the github action secret
 	// is older than the current IAM secret. Let's check.
 	if !needsRotation {
@@ -436,9 +440,13 @@ func (r *Rotate) disableAWSSecret(ctx context.Context, p *Project) error {
 	}
 
 	createDate := aws.TimeValue(okey.CreateDate)
-	needsDisabled := time.Since(createDate) > r.disableAfter
+	needsDisabled := time.Since(createDate) > r.rotateAfter+r.disableAfter
 	if !needsDisabled {
 		return nil
+	}
+
+	if r.verbose && needsDisabled {
+		fmt.Printf(" - Secret updated %v has not been updated in more than %v\n", p.SecretUpdatedAt, r.rotateAfter+r.disableAfter)
 	}
 
 	if r.verbose {
