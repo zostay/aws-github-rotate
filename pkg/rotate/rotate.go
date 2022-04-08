@@ -136,7 +136,7 @@ func (r *Rotate) RefreshGithubState(ctx context.Context) error {
 			}
 
 			//fmt.Printf("Try %s/%s\n", owner, name)
-			secrets, _, err := r.gc.Actions.ListRepoSecrets(ctx, owner, name, nil)
+			secrets, _, err := r.gc.Actions.ListRepoSecrets(ctx, owner, repo, nil)
 			if err != nil {
 				// assume this is a 403 not admin error and try the next
 				continue
