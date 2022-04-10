@@ -1,7 +1,6 @@
 package rotate
 
 import (
-	"errors"
 	"time"
 
 	"github.com/aws/aws-sdk-go/service/iam"
@@ -14,45 +13,40 @@ import (
 type Project struct {
 	*config.Project
 
-	SecretUpdatedAt time.Time // last update time of the github action secret
+	secretStoredAt  time.Time // timestamp of most recent secret stored in the client
+	secretRotatedAt time.Time // timestamp of most recent secret updated in the server
 
-	// We cache access key metadata to avoid making multiple calls to IAM that
-	// return the same information.
+	// Provide tools for caching metadata related to project secrets.
+
+	cache *map[any]any
 
 	OldestKey  *iam.AccessKeyMetadata // the oldest IAM key metadata
 	NewestKey  *iam.AccessKeyMetadata // the newest IAM key metadata
 	keysCached bool                   // true after oldestKey/newestKey are set (possibly to nil)
 }
 
-// TouchGithub sets the SecretUpdatedAt time to right now.
-func (p *Project) TouchGithub() {
-	p.SecretUpdatedAt = time.Now()
-}
-
-// ClearAWS clears the oldest and newest key cache.
-func (p *Project) ClearAWSKeyCache() {
-	p.OldestKey = nil
-	p.NewestKey = nil
-	p.keysCached = false
-}
-
-var (
-	ErrNotCached = errors.New("AWS keys not cached")
-)
-
-// GetAWSCache returns the cached keys and nil if they are cached or two nils
-// and an error if they are not cached.
-func (p *Project) GetAWSKeyCache() (*iam.AccessKeyMetadata, *iam.AccessKeyMetadata, error) {
-	if p.keysCached {
-		return p.OldestKey, p.NewestKey, nil
-	} else {
-		return nil, nil, ErrNotCached
+// NewProject sets up a new project configuration from the project.
+func NewProject(p *config.Project) *Project {
+	return &Project{
+		Project: p,
+		cache:   make(map[any]any, 0),
 	}
 }
 
-// SetAWSCache sets the AWS key cache to the given keys.
-func (p *Project) SetAWSKeyCache(o, n *iam.AccessKeyMetadata) {
-	p.OldestKey = o
-	p.NewestKey = n
-	p.keysCached = true
+// CacheSet sets a cache key associated with the project.
+func (p *Project) CacheSet(k, v any) {
+	p.cache[k] = v
+}
+
+// CacheGet returns a set cache key. The return value from this function is the
+// value set (or the zero value if nothing is set for that key), and a boolean
+// indicating whether a value has been set.
+func (p *Project) CacheGet(k any) (any, bool) {
+	v, ok := p.cache[k]
+	return v, ok
+}
+
+// CacheClear deletes the cache key.
+func (p *Project) CacheClear(k any) {
+	delete(p.cache, k)
 }

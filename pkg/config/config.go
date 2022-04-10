@@ -6,22 +6,19 @@ import (
 	"time"
 )
 
-// Project is the compiled metadata about each project for which we manage the
-// secrets and the associated secret metadata.
-type Project struct {
-	Name string // The user/name of the repo from the configuration
-	User string `yaml:"user"` // the IAM user name associated with the repo
+// KeyMap maps the keys produced by the source rotator to the keys to use in storage.
+type KeyMap map[string]string
 
-	AccessKey string `yaml:"access_key"` // The action secret key in which the access key is stored
-	SecretKey string `yaml:"secret_key"` // The action secret key in which the secret key is stored
+// GithubConfig is the Github-specific configuration.
+type GithubConfig struct {
+	Token string `yaml:"token"` // the github token configured (you should set this via the GITHUB_TOKEN environment variable)
 }
 
 // Config is the programmatic representation of the loaded configuration.
 type Config struct {
-	GithubToken string `yaml:"github_token"` // the github token configured (you should set this via the GITHUB_TOKEN environment variable)
+	Github GithubConfig `yaml:"github"` // github-specific configuration
 
-	DefaultAccessKey string `yaml:"default_access_key"` // the action secret key in which the access key is stored (unless overidden by the project)
-	DefaultSecretKey string `yaml:"default_secret_key"` // the action secret key in which the secret key is stored (unless overidden by the project)
+	KeyMap KeyMap `yaml:"key_map"` // the map of source keys to destination storage names
 
 	RotateAfter  time.Duration `yaml:"rotate_after"`  // the amount of time to wait before rotating a secret
 	DisableAfter time.Duration `yaml:"disable_after"` // the amount of time to wait before an old secret become disabled

@@ -16,6 +16,45 @@ import (
 	"github.com/zostay/aws-github-rotate/pkg/config"
 )
 
+type Projects []ProjectInfo
+type Users []UserInfo
+
+type CacheInfo interface {
+	CacheSet(any, any)
+	CacheGet(any) (any, bool)
+	CacheClear(any)
+}
+
+type ProjectInfo interface {
+	CacheInfo
+	Project() string
+}
+
+type UserInfo interface {
+	CacheInfo
+	User() string
+}
+
+type SaveClient interface {
+	Prepare(context.Context, Projects) error
+	LastSaved(context.Context, ProjectInfo) (time.Time, error)
+	SaveKey(context.Context, ProjectInfo, string, string) error
+}
+
+type Secrets map[string]string
+
+type RotateClient interface {
+	Prepare(context.Context, Users) error
+	LastRotated(context.Context, UserInfo) (time.Time, error)
+	RotateSecret(context.Context, UserInfo) (Secrets, error)
+}
+
+type DisableClient interface {
+	Prepare(context.Context, Users) error
+	LastUpdated(context.Context, UserInfo) (time.Time, error)
+	DisableSecret(context.Context, UserInfo) error
+}
+
 // Rotate is an object capable of rotating a bunch of configured AWS password
 // related to github objects and then update the related action secrets.
 type Rotate struct {
