@@ -54,15 +54,6 @@ func New(svcIam *iam.IAM) *Client {
 	return &Client{svcIam}
 }
 
-// Prepare does any preparatory work to get the client ready for performing
-// either rotation or disablement. As of this writing, this function is a no-op.
-func Prepare(
-	ctx context.Context,
-	users rotate.Users,
-) error {
-	return nil
-}
-
 // LastRotated will return the data of the newest key on the IAM account.
 func (c *Client) LastRotated(
 	ctx context.Context,

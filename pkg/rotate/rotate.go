@@ -35,22 +35,19 @@ type UserInfo interface {
 	User() string
 }
 
-type SaveClient interface {
-	Prepare(context.Context, Projects) error
-	LastSaved(context.Context, ProjectInfo) (time.Time, error)
-	SaveKey(context.Context, ProjectInfo, string, string) error
-}
-
 type Secrets map[string]string
 
+type SaveClient interface {
+	LastSaved(context.Context, ProjectInfo, string) (time.Time, error)
+	SaveKey(context.Context, ProjectInfo, Secrets) error
+}
+
 type RotateClient interface {
-	Prepare(context.Context, Users) error
 	LastRotated(context.Context, UserInfo) (time.Time, error)
 	RotateSecret(context.Context, UserInfo) (Secrets, error)
 }
 
 type DisableClient interface {
-	Prepare(context.Context, Users) error
 	LastUpdated(context.Context, UserInfo) (time.Time, error)
 	DisableSecret(context.Context, UserInfo) error
 }
