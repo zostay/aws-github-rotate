@@ -39,7 +39,7 @@ type Secrets map[string]string
 
 type SaveClient interface {
 	LastSaved(context.Context, ProjectInfo, string) (time.Time, error)
-	SaveKey(context.Context, ProjectInfo, Secrets) error
+	SaveKeys(context.Context, ProjectInfo, Secrets) error
 }
 
 type RotateClient interface {

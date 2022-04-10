@@ -13,34 +13,31 @@ import (
 	"github.com/zostay/aws-github-rotate/pkg/rotate"
 )
 
+// secretUpdateAt is the container for last updated date's cache keys.
 type secretUpdatedAt struct {
 	name string
 }
 
-type projectMap map[string]rotate.ProjectInfo
-
+// Client implements the rotate.SaveClient interface for storing keys following
+// rotation.
 type Client struct {
-	gc       *github.Client
-	projects projectMap
+	gc *github.Client
 }
 
-func projectsMap(ps rotate.Projects) ProjectMap {
-	pm := make(ProjectMap, len(ps))
-	for i, p := range ps {
-		pm[p.Name()] = p
-	}
-	return pm
-}
-
+// parts splits a project name into the owner/repo form used for github
+// projects.
 func parts(p rotate.ProjectInfo) (string, string) {
 	o, r, _ := strings.Cut(p.Name(), "/")
 	return o, r
 }
 
+// setCachedKeyTime is a helper that stores the cached secret UpdatedAt value.
 func setCachedKeyTime(p rotate.ProjectInfo, secret string, upd time.Time) {
 	p.CacheSet(secretUpdatedAt{secret}, upd)
 }
 
+// getCachedKeyTime is a helper that retrieves the cached secret UpdatedAt
+// value.
 func getCachedKeyTime(p rotate.ProjectInfo, secret string) (time.Time, bool) {
 	t, ok := p.CacheGet(secretUpdatedAt{secret})
 	if time, typeOk := t.(time.Time); ok && typeOk {
@@ -49,10 +46,15 @@ func getCachedKeyTime(p rotate.ProjectInfo, secret string) (time.Time, bool) {
 	return time.Time{}, false
 }
 
+// touchCachedKeyTime is a helper that sets the cached secret UpdatedAt value to
+// now.
 func touchCachedKeyTime(p rotate.ProjectInfo, secret string) {
 	setCachedKeyTime(secret, time.Now())
 }
 
+// LastSaved checks for the given key on the given project to see when it was
+// last saved. It will return that value, if it has been stored previously. If
+// it has not been stored previously, it returns the zero value.
 func (c *Client) LastSaved(
 	ctx context.Context,
 	p rotate.ProjectInfo,
@@ -85,7 +87,8 @@ func (c *Client) LastSaved(
 	return upd, nil
 }
 
-func (c *Client) SaveKey(
+// SaveKeys saves each of the secrets given in the project.
+func (c *Client) SaveKeys(
 	ctx context.Context,
 	p rotate.ProjectInfo,
 	ss rotate.Secrets,
