@@ -5,22 +5,46 @@ disable_after: "48h"
 default_access_key: AWS_ACCESS_KEY_ID
 default_secret_key: AWS_SECRET_ACCESS_KEY
 
-projects:
-  - name: ***REMOVED***
-    user: ***REMOVED***
-  - name: ***REMOVED***
-    user: ***REMOVED***
-  - name: ***REMOVED***
-    user: ***REMOVED***
-  - name: zostay/periodic-s3-sync
-    user: ***REMOVED***
-  - name: zostay/postfix
-    user: ***REMOVED***
-  - name: ***REMOVED***
-    user: ***REMOVED***
-  - name: ***REMOVED***
-    user: ***REMOVED***
-  - name: ***REMOVED***
-    user: ***REMOVED***
-  - name: ***REMOVED***
-    user: ***REMOVED***
+clients:
+  - name: IAM
+    plugin: github.com/zostay/aws-github-rotate/pkg/rotate/iam
+    rotate_after: "168h"
+    disable_after: "48h"
+
+storages:
+  - name: github
+    plugin: github.com/zostay/aws-github-rotate/pkg/rotate/github
+
+secrets:
+  - client: IAM
+    secret: ***REMOVED***
+    storages:
+     - storage: github
+       name: ***REMOVED***
+       keys:
+         AWS_ACCESS_KEY_ID: AWS_ACCESS_KEY_ID
+         AWS_SECRET_ACCESS_KEY: AWS_SECRET_ACCESS_KEY
+  - secret: ***REMOVED***
+    storages:
+     - name: ***REMOVED***
+  - secret: ***REMOVED***
+    storages:
+     - name: ***REMOVED***
+  - secret: ***REMOVED***
+    storages:
+     - name: zostay/periodic-s3-sync
+  - secret: ***REMOVED***
+    storages:
+     - name: zostay/postfix
+  - secret: ***REMOVED***
+    storages:
+     - name: ***REMOVED***
+  - secret: ***REMOVED***
+    storages:
+     - name: ***REMOVED***
+  - secret: ***REMOVED***
+    storages:
+     - name: ***REMOVED***
+# possible shorthand if only a single storage and secret?
+  - secret: ***REMOVED***
+    name: ***REMOVED***
