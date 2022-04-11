@@ -10,8 +10,8 @@ import (
 
 // Project is the compiled metadata about each project for which we manage the
 // secrets and the associated secret metadata.
-type Project struct {
-	*config.Project
+type Secret struct {
+	*config.Secret
 
 	secretStoredAt  time.Time // timestamp of most recent secret stored in the client
 	secretRotatedAt time.Time // timestamp of most recent secret updated in the server

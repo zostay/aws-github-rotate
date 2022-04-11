@@ -20,6 +20,9 @@ type secretUpdatedAt struct {
 
 // Client implements the rotate.SaveClient interface for storing keys following
 // rotation.
+//
+// To use this client, a GITHUB_TOKEN environment variable must be set to a
+// github access token with adequate permissions to update action secrets.
 type Client struct {
 	gc *github.Client
 }

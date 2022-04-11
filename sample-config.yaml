@@ -1,50 +1,51 @@
 ---
-rotate_after: "168h"
-disable_after: "48h"
-
-default_access_key: AWS_ACCESS_KEY_ID
-default_secret_key: AWS_SECRET_ACCESS_KEY
-
 clients:
-  - name: IAM
-    plugin: github.com/zostay/aws-github-rotate/pkg/rotate/iam
-    rotate_after: "168h"
-    disable_after: "48h"
+  github:
+    package: github.com/zostay/aws-github-rotate/pkg/plugin/github
+  IAM:
+    package: github.com/zostay/aws-github-rotate/pkg/plugin/iam
 
-storages:
-  - name: github
-    plugin: github.com/zostay/aws-github-rotate/pkg/rotate/github
-
-secrets:
+rotations:
   - client: IAM
-    secret: ***REMOVED***
-    storages:
-     - storage: github
+    rotate_after: "168h"
+    secret_set: main
+
+disablements:
+  - client: IAM
+    disable_after: "216h"
+    secret_set: main
+
+secret_sets:
+  - name: main
+    secrets:
+     - secret: ***REMOVED***
+       storages:
+        - storage: github
+          name: ***REMOVED***
+          keys:
+            AWS_ACCESS_KEY_ID: AWS_ACCESS_KEY_ID
+            AWS_SECRET_ACCESS_KEY: AWS_SECRET_ACCESS_KEY
+     - secret: ***REMOVED***
+       storages:
+        - name: ***REMOVED***
+     - secret: ***REMOVED***
+       storages:
+        - name: ***REMOVED***
+     - secret: ***REMOVED***
+       storages:
+        - name: zostay/periodic-s3-sync
+     - secret: ***REMOVED***
+       storages:
+        - name: zostay/postfix
+     - secret: ***REMOVED***
+       storages:
+        - name: ***REMOVED***
+     - secret: ***REMOVED***
+       storages:
+        - name: ***REMOVED***
+     - secret: ***REMOVED***
+       storages:
+        - name: ***REMOVED***
+   # possible shorthand if only a single storage and secret?
+     - secret: ***REMOVED***
        name: ***REMOVED***
-       keys:
-         AWS_ACCESS_KEY_ID: AWS_ACCESS_KEY_ID
-         AWS_SECRET_ACCESS_KEY: AWS_SECRET_ACCESS_KEY
-  - secret: ***REMOVED***
-    storages:
-     - name: ***REMOVED***
-  - secret: ***REMOVED***
-    storages:
-     - name: ***REMOVED***
-  - secret: ***REMOVED***
-    storages:
-     - name: zostay/periodic-s3-sync
-  - secret: ***REMOVED***
-    storages:
-     - name: zostay/postfix
-  - secret: ***REMOVED***
-    storages:
-     - name: ***REMOVED***
-  - secret: ***REMOVED***
-    storages:
-     - name: ***REMOVED***
-  - secret: ***REMOVED***
-    storages:
-     - name: ***REMOVED***
-# possible shorthand if only a single storage and secret?
-  - secret: ***REMOVED***
-    name: ***REMOVED***
