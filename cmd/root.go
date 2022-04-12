@@ -2,17 +2,11 @@ package cmd
 
 import (
 	"fmt"
-	"os"
 	"time"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"github.com/zostay/aws-github-rotate/pkg/config"
-)
-
-const (
-	DefaultAccessKey = "AWS_ACCESS_KEY_ID"
-	DefaultSecretKey = "AWS_SECRET_ACCESS_KEY"
 )
 
 var (
@@ -21,10 +15,12 @@ var (
 	cfgFile string
 	dryRun  bool
 	verbose bool
+	devMode bool
+	logger  *zap.Logger
 )
 
 func init() {
-	cobra.OnInitialize(initConfig)
+	cobra.OnInitialize(initLogger, initConfig)
 
 	rootCmd = &cobra.Command{
 		Use:   "aws-github-rotate",
@@ -34,32 +30,60 @@ func init() {
 	viper.SetDefault("RotateAfter", 168*time.Hour)
 	viper.SetDefault("DisableAfter", 48*time.Hour)
 
-	rootCmd.PersistentFlags().StringVar(&cfgFile, "config-file", "", "config file (default is /aws-github-rotate.yaml)")
-	rootCmd.PersistentFlags().Duration("rotate-after", 168*time.Hour, "keys older than rotate-after will be rotated")
-	rootCmd.PersistentFlags().Duration("disable-after", 48*time.Hour, "keys older than rotate-after + disable-after will be disabled")
-	rootCmd.PersistentFlags().String("access-key", DefaultAccessKey, "set the default key to use to store the access key in github")
-	rootCmd.PersistentFlags().String("secret-key", DefaultSecretKey, "set the default key to use to store the secret key in github")
-	rootCmd.PersistentFlags().BoolVar(&dryRun, "dry-run", false, "a dry-run describes what would happen without doing it")
-	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "more verbose logging")
+	rootCmd.PersistentFlags().BoolVar(
+		&devMode, "dev-mode",
+		"turns on developer mode logging",
+	)
+	rootCmd.PersistentFlags().StringVar(
+		&cfgFile, "config-file", "",
+		"config file (default is /aws-github-rotate.yaml)",
+	)
+	rootCmd.PersistentFlags().Duration(
+		"rotate-after", 168*time.Hour,
+		"keys older than rotate-after will be rotated",
+	)
+	rootCmd.PersistentFlags().Duration(
+		"disable-after", 48*time.Hour,
+		"keys older than rotate-after + disable-after will be disabled",
+	)
+	rootCmd.PersistentFlags().BoolVar(
+		&dryRun, "dry-run", false,
+		"a dry-run describes what would happen without doing it",
+	)
+	rootCmd.PersistentFlags().BoolVarP(
+		&verbose, "verbose", "v", false,
+		"more verbose logging",
+	)
 
-	viper.BindPFlag("rotateAfter", rootCmd.PersistentFlags().Lookup("rotate-after"))
-	viper.BindPFlag("disableAfter", rootCmd.PersistentFlags().Lookup("disable-after"))
-	viper.BindPFlag("defaultAccessKey", rootCmd.PersistentFlags().Lookup("access-key"))
-	viper.BindPFlag("defaultSecretKey", rootCmd.PersistentFlags().Lookup("secret-key"))
+	viper.BindPFlag(
+		"rotateAfter", rootCmd.PersistentFlags().Lookup("rotate-after"),
+	)
+	viper.BindPFlag(
+		"disableAfter", rootCmd.PersistentFlags().Lookup("disable-after"),
+	)
 
-	viper.BindEnv("githubToken", "GITHUB_TOKEN")
 	viper.SetDefault("rotateAfter", 168*time.Hour)
 	viper.SetDefault("disableAfter", 48*time.Hour)
-	viper.SetDefault("defaultAccessKey", DefaultAccessKey)
-	viper.SetDefault("defaultSecretKey", DefaultSecretKey)
 
 	initRotateCmd()
 	initDisableCmd()
 }
 
-func fatalf(f string, args ...any) {
-	fmt.Fprintf(os.Stderr, f, args...)
-	os.Exit(1)
+func initLogger() {
+	var err error
+	if devMode {
+		logger, err = zap.NewDevelopment()
+	} else {
+		logger, err = zap.NewProduction()
+	}
+
+	logger = logger.WithOptions(
+		zap.IncreaseLevel(zap.DebugLevel),
+	)
+
+	if err != nil {
+		panic(fmt.Sprintf("failure to setup logger: %w", err))
+	}
 }
 
 func initConfig() {
@@ -73,19 +97,21 @@ func initConfig() {
 
 	viper.AutomaticEnv()
 
+	slog := logger.Sugar()
+
 	err := viper.ReadInConfig()
 	if err != nil {
-		fatalf("unable to read configuration: %v", err)
+		slog.Fatalf("unable to read configuration: %v", err)
 	}
 
 	err = viper.Unmarshal(&c)
 	if err != nil {
-		fatalf("unable to unmarshal configuration: %v", err)
+		slog.Fatalf("unable to unmarshal configuration: %v", err)
 	}
 
 	err = c.Prepare()
 	if err != nil {
-		fatalf("unable to finish processing configuration: %v", err)
+		slog.Fatalf("unable to finish processing configuration: %v", err)
 	}
 
 	// if verbose {
