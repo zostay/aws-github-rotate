@@ -13,7 +13,7 @@ type Storage interface {
 
 type Info interface {
 	Cache
-	Secret() string
+	Name() string
 }
 
 type Map map[string]string

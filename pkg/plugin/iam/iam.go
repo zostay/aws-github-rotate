@@ -8,7 +8,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/iam"
 	"github.com/zostay/aws-github-rotate/pkg/config"
-	"github.com/zostay/aws-github-rotate/pkg/rotate"
+	"github.com/zostay/aws-github-rotate/pkg/secret"
 )
 
 const (
@@ -30,14 +30,14 @@ type Client struct {
 }
 
 // clearCache is a helper for clearing the cache of keys fetched from AWS.
-func clearCache(u UserInfo) {
-	u.CacheClear(gotkeys{})
+func clearCache(c secret.Cache) {
+	c.CacheClear(gotkeys{})
 }
 
 // getCache is a helper for retrieving the keys cached from a previous AWS
 // fetch.
-func getCache(u UserInfo) (*iam.AccessKeyMetadata, *iam.AccessKeyMetadata, bool) {
-	k, ok := u.CacheGet(gotkeys{})
+func getCache(c secret.Cache) (*iam.AccessKeyMetadata, *iam.AccessKeyMetadata, bool) {
+	k, ok := c.CacheGet(gotkeys{})
 	if keys, typeOk := k.([]*iam.AccessKeyMetadata); ok && typeOk && len(keys) == 2 {
 		return keys[0], keys[1], true
 	}
@@ -45,8 +45,8 @@ func getCache(u UserInfo) (*iam.AccessKeyMetadata, *iam.AccessKeyMetadata, bool)
 }
 
 // setCache is a helper for setting the keys just gotten from an AWS fetch.
-func setCache(u UserInfo, oldKey, newKey *iam.AccessKeyMetadata) {
-	u.CacheSet(gotkeys{}, []*iam.AccessKeyMetadata{oldKey, newKey})
+func setCache(c secret.Cache, oldKey, newKey *iam.AccessKeyMetadata) {
+	c.CacheSet(gotkeys{}, []*iam.AccessKeyMetadata{oldKey, newKey})
 }
 
 // New returns a the client which implements rotate.Client and disable.Client.
@@ -54,12 +54,17 @@ func New(svcIam *iam.IAM) *Client {
 	return &Client{svcIam}
 }
 
+// Name returns "AWS IAM"
+func Name() string {
+	return "AWS IAM"
+}
+
 // LastRotated will return the data of the newest key on the IAM account.
 func (c *Client) LastRotated(
 	ctx context.Context,
-	user rotate.UserInfo,
+	sec secret.Info,
 ) (time.Time, error) {
-	_, newKey, err := c.getAccessKeys(ctx, user)
+	_, newKey, err := c.getAccessKeys(ctx, sec)
 	if err != nil {
 		return time.Time{}, err
 	}
@@ -76,17 +81,18 @@ func (c *Client) LastRotated(
 // On error, an empty map is returned with an error.
 func (c *Client) RotateSecret(
 	ctx context.Context,
-	u rotate.UserInfo,
-) (rotate.Secrets, error) {
+	sec secret.Info,
+) (secret.Map, error) {
 	logger := config.LoggerFrom(ctx).Sugar()
 	logger.Infow(
 		"rotating IAM account for %s",
-		"user", p.Name,
+		"client", c.Name(),
+		"secret", sec.Name(),
 	)
 
 	oldKey, newKey, err := c.getAccessKeys(ctx, u)
 	if err != nil {
-		return rotate.Secrets{}, fmt.Errorf("getAccessKeys(%q): %w", u.User(), err)
+		return secret.Map{}, fmt.Errorf("failed to retrieve IAM access key metadata for IAM user %q: %w", sec.Name(), err)
 	}
 
 	var oak, nak string
@@ -99,30 +105,34 @@ func (c *Client) RotateSecret(
 
 	if oldKey != nil && oak != nak {
 		if !r.dryRun {
-			clearCache(u)
-			_, err := r.svcIam.DeleteAccessKey(&iam.DeleteAccessKeyInput{
-				UserName:    aws.String(p.User),
-				AccessKeyId: oldKey.AccessKeyId,
-			})
+			clearCache(sec)
+			_, err := r.svcIam.DeleteAccessKey(
+				&iam.DeleteAccessKeyInput{
+					UserName:    aws.String(sec.Name()),
+					AccessKeyId: oldKey.AccessKeyId,
+				},
+			)
 			if err != nil {
-				return rotate.Secrets{}, fmt.Errorf("svcIam.DeleteAccessKey(): %w", err)
+				return secret.Map{}, fmt.Errorf("failed to delete old access key for IAM user %q: %w", sec.Name(), err)
 			}
 		}
 	}
 
 	var accessKey, secretKey string
 	clearCache(u)
-	ck, err := c.svcIam.CreateAccessKey(&iam.CreateAccessKeyInput{
-		UserName: aws.String(p.User),
-	})
+	ck, err := c.svcIam.CreateAccessKey(
+		&iam.CreateAccessKeyInput{
+			UserName: aws.String(sec.Name()),
+		},
+	)
 	if err != nil {
-		return rotate.Secrets{}, fmt.Errorf("svcIam.CreateAccessKey(): %w", err)
+		return secret.Map{}, fmt.Errorf("failed to create new access key for IAM user %q: %w", sec.Name(), err)
 	}
 
 	accessKey = aws.StringValue(ck.AccessKey.AccessKeyId)
 	secretKey = aws.StringValue(ck.AccessKey.SecretAccessKey)
 
-	return rotate.Secrets{
+	return secret.Map{
 		AccessKeyName: accessKey,
 		SecretKeyName: secretKey,
 	}, nil
@@ -131,9 +141,9 @@ func (c *Client) RotateSecret(
 // LastUpdated returns the date of the old key associated with the IAM user.
 func (c *Client) LastUpdated(
 	ctx context.Context,
-	user rotate.UserInfo,
+	sec secret.Info,
 ) (time.Time, error) {
-	oldKey, _, err := c.getAccessKeys(ctx, user)
+	oldKey, _, err := c.getAccessKeys(ctx, sec)
 	if err != nil {
 		return time.Time{}, nil
 	}
@@ -144,27 +154,29 @@ func (c *Client) LastUpdated(
 // DisableSecret performs disabling of the old key on AWS IAM.
 func (c *Client) DisableSecret(
 	ctx context.Context,
-	u rotate.UserInfo,
+	sec secret.Info,
 ) error {
-	okey, _, err := c.getAccessKeys(ctx, user)
+	okey, _, err := c.getAccessKeys(ctx, sec)
 	if err != nil {
-		return fmt.Errorf("failed to retrieve key information: %w", err)
+		return fmt.Errorf("failed to retrieve IAM access key metadata for IAM user %q: %w", sec.Name(), err)
 	}
 
 	logger := config.LoggerFrom(ctx).Sugar()
 	logger.Infow(
 		"disabling old IAM account key",
-		"user", u.User(),
+		"user", sec.Name(),
 	)
 
-	clearCache(u)
-	_, err = c.svcIam.UpdateAccessKey(&iam.UpdateAccessKeyInput{
-		AccessKeyId: okey.AccessKeyId,
-		Status:      aws.String(iam.StatusTypeInactive),
-		UserName:    aws.String(p.User),
-	})
+	clearCache(sec)
+	_, err = c.svcIam.UpdateAccessKey(
+		&iam.UpdateAccessKeyInput{
+			AccessKeyId: okey.AccessKeyId,
+			Status:      aws.String(iam.StatusTypeInactive),
+			UserName:    aws.String(sec.Name()),
+		},
+	)
 	if err != nil {
-		return fmt.Errorf("failed to update access key status to inactive: %w", err)
+		return fmt.Errorf("failed to update access key status to inactive of old IAM access key for use %q: %w", sec.Name(), err)
 	}
 
 	return nil
@@ -176,21 +188,23 @@ func (c *Client) DisableSecret(
 // set then the first and second key returned will be equal.
 func (c *Client) getAccessKeys(
 	ctx context.Context,
-	u UserInfo,
+	sec secret.Info,
 ) (*iam.AccessKeyMetadata, *iam.AccessKeyMetadata, error) {
-	if o, n, ok := getCache(u); ok {
+	if o, n, ok := getCache(sec); ok {
 		return o, n, nil
 	}
 
-	ak, err := c.svcIam.ListAccessKeys(&iam.ListAccessKeysInput{
-		UserName: aws.String(u.User()),
-	})
+	ak, err := c.svcIam.ListAccessKeys(
+		&iam.ListAccessKeysInput{
+			UserName: aws.String(sec.Name()),
+		},
+	)
 	if err != nil {
-		return nil, nil, fmt.Errorf("svcIam.ListAccessKeys(%q): %w", p.User, err)
+		return nil, nil, fmt.Errorf("failed to list IAM access key metadata for user %q: %w", sec.Name(), err)
 	}
 
 	oldKey, newKey := examineKeys(ak.AccessKeyMetadata)
-	setCache(u, oldKey, newKey)
+	setCache(sec, oldKey, newKey)
 	return oldKey, newKey, nil
 }
 
