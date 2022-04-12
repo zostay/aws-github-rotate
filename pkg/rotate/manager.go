@@ -31,7 +31,7 @@ func New(
 	dryRun bool,
 	secrets []*config.Secret,
 ) *Manager {
-	ss := make([]*Project, len(secrets))
+	ss := make([]*Secret, len(secrets))
 	for i, s := range secrets {
 		ss[i] = NewSecret(s)
 	}
@@ -66,7 +66,7 @@ func (m *Manager) needsRotation(
 			"secret", s.Secret(),
 			"client", client.Name(),
 		)
-		continue
+		return false
 	}
 
 	if time.Since(rotated) > m.rotateAfter {
@@ -117,8 +117,8 @@ func (m *Manager) needsRotation(
 // rotated by calling needsRotation(). If not, it does nothing further. If so,
 // it tells the rotation client to rotate the secret. It then it saves the newly
 // minted secret in all configured storage locations.
-func (r *Rotate) rotateSecret(ctx context.Context, s *Secret) error {
-	if !r.needsRotation(ctx, s) {
+func (m *Manager) rotateSecret(ctx context.Context, s *Secret) error {
+	if !m.needsRotation(ctx, s) {
 		return nil
 	}
 
@@ -165,7 +165,7 @@ func (m *Manager) RotateSecrets(ctx context.Context) error {
 			"client", m.client.Name(),
 		)
 
-		err := r.rotateSecret(ctx, s)
+		err := m.rotateSecret(ctx, s)
 		if err != nil {
 			return fmt.Errorf("failed to rotate secret: %w", err)
 		}

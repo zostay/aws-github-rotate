@@ -6,6 +6,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"github.com/zostay/aws-github-rotate/pkg/config"
+	"go.uber.org/zap"
 )
 
 var (
@@ -16,10 +17,11 @@ var (
 	verbose bool
 	devMode bool
 	logger  *zap.Logger
+	ctx context.Context
 )
 
 func init() {
-	cobra.OnInitialize(initLogger, initConfig)
+	cobra.OnInitialize(initContext, initConfig)
 
 	rootCmd = &cobra.Command{
 		Use:   "aws-github-rotate",
@@ -68,7 +70,7 @@ func init() {
 	initDisableCmd()
 }
 
-func initLogger() {
+func initContext() {
 	var err error
 	if devMode {
 		logger = config.DevelopmentLogger()
@@ -81,6 +83,8 @@ func initLogger() {
 			zap.IncreaseLevel(zap.DebugLevel),
 		)
 	}
+
+	ctx = config.WithLogger(context.Background(), logger)
 }
 
 func initConfig() {

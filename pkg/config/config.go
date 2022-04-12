@@ -11,7 +11,7 @@ type KeyMap map[string]string
 // Client is used to load plugins the implement various client interfaces.
 type Client struct {
 	name    string
-	Plugin  string         `yaml:"plugin"`
+	Package string         `yaml:"package"`
 	Options map[string]any `yaml:"option"`
 }
 

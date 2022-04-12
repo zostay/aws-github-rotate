@@ -1,8 +1,6 @@
 package cmd
 
 import (
-	"context"
-
 	"github.com/spf13/cobra"
 	"github.com/zostay/aws-github-rotate/pkg/rotate"
 )
@@ -22,18 +20,19 @@ func initDisableCmd() {
 }
 
 func RunDisable(cmd *cobra.Command, args []string) {
-	ctx := context.Background()
-	gc := githubClient(ctx, c.GithubToken)
-	svcIam := iamClient(ctx)
+	slog := logger.Sugar()
 
-	r := rotate.New(
+	err := loadPlugins(ctx, c.Clients)
+	if err != nil {
+		slog.Fatal(err)
+	}
+
+	m := disable.New(
 		gc, svcIam,
 		c.RotateAfter, c.DisableAfter,
 		dryRun, verbose,
 		c.ProjectMap,
 	)
-
-	slog := logger.Sugar()
 
 	err := r.RefreshGithubState(ctx)
 	if err != nil {

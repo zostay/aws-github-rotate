@@ -40,10 +40,10 @@ func Get(pkg string) Builder {
 // Build will construct a plugin instance and return it. If the instance fails
 // during construction, an error will be returned. If no plugin is registered
 // for the given package, an error will be returned.
-func Build(pkg string, c *config.Client) (Instance, error) {
+func Build(ctx context.Context, pkg string, c *config.Client) (Instance, error) {
 	p := registry.Get(pkg)
 	if p != nil {
-		return p.Build(c)
+		return p.Build(ctx, c)
 	}
 
 	return nil, fmt.Errorf("no plugin found for package %q", pkg)
