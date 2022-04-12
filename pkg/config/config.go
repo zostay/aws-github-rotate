@@ -71,7 +71,7 @@ func (c *Config) Prepare() error {
 
 	secSetSet := make(map[string]struct{}, len(c.SecretSets))
 	for i := range c.SecretSets {
-		secSet := &c.SecretSet
+		secSet := &c.SecretSets[i]
 		if _, alreadyExists := secSetSet[secSet.Name]; alreadyExists {
 			return fmt.Errorf("secret set %q is duplicated", secSet.Name)
 		}

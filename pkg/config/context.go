@@ -37,13 +37,13 @@ func ProductionLogger() *zap.Logger {
 		os.Stderr,
 		zapcore.InfoLevel,
 	)
-	return zapcore.New(core)
+	return zap.New(core)
 }
 
 // DevelopmentLogger works like zap.NewDevelopment(), but should always return a
 // configured logger and no error.
 func DevelopmentLogger() *zap.Logger {
-	return zapcore.EncoderConfig{
+	encoderCfg := zapcore.EncoderConfig{
 		// Keys can be anything except the empty string.
 		TimeKey:        "T",
 		LevelKey:       "L",
@@ -65,7 +65,7 @@ func DevelopmentLogger() *zap.Logger {
 		zapcore.DebugLevel,
 	)
 
-	return zapcore.New(core).WithOptions(zap.Development())
+	return zap.New(core).WithOptions(zap.Development())
 }
 
 // WithLogger puts the given logger into the given context and returns the
@@ -79,9 +79,9 @@ func WithLogger(p context.Context, log *zap.Logger) context.Context {
 // DefaultLogger() is guaranteed to return a non-nil result, this function is
 // also guaranteed to return a result.
 func LoggerFrom(ctx context.Context) *zap.Logger {
-	logger, ok := ctx.Value(loggerkey{}).(*zap.Logger)
+	logger, ok := ctx.Value(loggerKey{}).(*zap.Logger)
 	if !ok {
-		logger := DefaultLogger()
+		logger = DefaultLogger()
 	}
 	return logger
 }
