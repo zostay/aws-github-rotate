@@ -37,7 +37,35 @@ func ProductionLogger() *zap.Logger {
 		os.Stderr,
 		zapcore.InfoLevel,
 	)
-	return New(core).WithOptions(options...)
+	return zapcore.New(core)
+}
+
+// DevelopmentLogger works like zap.NewDevelopment(), but should always return a
+// configured logger and no error.
+func DevelopmentLogger() *zap.Logger {
+	return zapcore.EncoderConfig{
+		// Keys can be anything except the empty string.
+		TimeKey:        "T",
+		LevelKey:       "L",
+		NameKey:        "N",
+		CallerKey:      "C",
+		FunctionKey:    zapcore.OmitKey,
+		MessageKey:     "M",
+		StacktraceKey:  "S",
+		LineEnding:     zapcore.DefaultLineEnding,
+		EncodeLevel:    zapcore.CapitalLevelEncoder,
+		EncodeTime:     zapcore.ISO8601TimeEncoder,
+		EncodeDuration: zapcore.StringDurationEncoder,
+		EncodeCaller:   zapcore.ShortCallerEncoder,
+	}
+
+	core := zapcore.NewCore(
+		zapcore.NewConsoleEncoder(encoderCfg),
+		os.Stderr,
+		zapcore.DebugLevel,
+	)
+
+	return zapcore.New(core).WithOptions(zap.Development())
 }
 
 // WithLogger puts the given logger into the given context and returns the

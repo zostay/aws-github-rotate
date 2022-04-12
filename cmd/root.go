@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -72,17 +71,15 @@ func init() {
 func initLogger() {
 	var err error
 	if devMode {
-		logger, err = zap.NewDevelopment()
+		logger = config.DevelopmentLogger()
 	} else {
-		logger, err = zap.NewProduction()
+		logger = config.ProductionLogger()
 	}
 
-	logger = logger.WithOptions(
-		zap.IncreaseLevel(zap.DebugLevel),
-	)
-
-	if err != nil {
-		panic(fmt.Sprintf("failure to setup logger: %w", err))
+	if verbose {
+		logger = logger.WithOptions(
+			zap.IncreaseLevel(zap.DebugLevel),
+		)
 	}
 }
 
