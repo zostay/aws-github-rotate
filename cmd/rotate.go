@@ -37,20 +37,22 @@ func RunRotation(cmd *cobra.Command, args []string) {
 		c.ProjectMap,
 	)
 
+	slog := logger.Sugar()
+
 	err := r.RefreshGithubState(ctx)
 	if err != nil {
-		fatalf("%v", err)
+		slog.Fatal(err)
 	}
 
 	err = r.RotateSecrets(ctx)
 	if err != nil {
-		fatalf("%v", err)
+		slog.Fatal(err)
 	}
 
 	if alsoDisable {
 		err = r.DisableOldSecrets(ctx)
 		if err != nil {
-			fatalf("%v", err)
+			slog.Fatal(err)
 		}
 	}
 }
