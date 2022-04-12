@@ -10,15 +10,9 @@ type KeyMap map[string]string
 
 // Client is used to load plugins the implement various client interfaces.
 type Client struct {
-	name    string
+	Name    string         `yaml:"-"`
 	Package string         `yaml:"package"`
 	Options map[string]any `yaml:"option"`
-}
-
-// Name returns the name of the client as configured via the key in the clients
-// configuration.
-func (c *Client) Name() string {
-	return c.name
 }
 
 // Rotation is used to define a rotation process.
@@ -44,7 +38,7 @@ type StorageMap struct {
 
 // Secret defines a single rotatable secret.
 type Secret struct {
-	Secret   string       `yaml:"secret"`
+	Name     string       `yaml:"name"`
 	Storages []StorageMap `yaml:"storages"`
 }
 
@@ -71,28 +65,28 @@ type Config struct {
 // Returns an error if there's a problem is detected with the configuration or
 // nil if no problem is found.
 func (c *Config) Prepare() error {
-	for k, c := range c.clients {
-		c.name = k
-
+	for k, c := range c.Clients {
+		c.Name = k
 	}
 
-	for i := range c.Projects {
-		if _, alreadyExists := pm[c.Projects[i].Name]; alreadyExists {
-			return fmt.Errorf("project named %q is repeated twice in the configuration", c.Projects[i].Name)
+	secSetSet := make(map[string]struct{}, len(c.SecretSets))
+	for i := range c.SecretSets {
+		secSet := &c.SecretSet
+		if _, alreadyExists := secSetSet[secSet.Name]; alreadyExists {
+			return fmt.Errorf("secret set %q is duplicated", secSet.Name)
 		}
+		secSetSet[secSet.Name] = struct{}{}
 
-		if c.Projects[i].AccessKey == "" {
-			c.Projects[i].AccessKey = c.DefaultAccessKey
+		secMap := make(map[string]struct{}, len(secSet.Secrets))
+		for j := range secSet.Secrets {
+			sec := &secSet.Secrets[j]
+			if _, alreadyExists := secMap[sec.Name]; alreadyExists {
+				return fmt.Errorf("in set %q, secret named %q is repeated twice in the configuration", secSet.Name, sec.Name)
+			}
+
+			secMap[sec.Name] = struct{}{}
 		}
-
-		if c.Projects[i].SecretKey == "" {
-			c.Projects[i].SecretKey = c.DefaultSecretKey
-		}
-
-		pm[c.Projects[i].Name] = &c.Projects[i]
 	}
-
-	c.ProjectMap = pm
 
 	return nil
 }
