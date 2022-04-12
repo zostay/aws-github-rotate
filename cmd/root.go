@@ -110,10 +110,6 @@ func initConfig() {
 	if err != nil {
 		slog.Fatalf("unable to finish processing configuration: %v", err)
 	}
-
-	// if verbose {
-	// 	fmt.Printf("%+v\n", c)
-	// }
 }
 
 func Execute() {
