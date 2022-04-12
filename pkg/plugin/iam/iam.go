@@ -49,11 +49,6 @@ func setCache(c secret.Cache, oldKey, newKey *iam.AccessKeyMetadata) {
 	c.CacheSet(gotkeys{}, []*iam.AccessKeyMetadata{oldKey, newKey})
 }
 
-// New returns a the client which implements rotate.Client and disable.Client.
-func New(svcIam *iam.IAM) *Client {
-	return &Client{svcIam}
-}
-
 // Name returns "AWS IAM"
 func Name() string {
 	return "AWS IAM"

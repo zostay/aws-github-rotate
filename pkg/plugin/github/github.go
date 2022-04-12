@@ -11,6 +11,7 @@ import (
 	"github.com/jamesruan/sodium"
 	"github.com/zostay/aws-github-rotate/pkg/config"
 	"github.com/zostay/aws-github-rotate/pkg/rotate"
+	"github.com/zostay/aws-github-rotate/pkg/secret"
 )
 
 // secretUpdateAt is the container for last updated date's cache keys.
@@ -35,14 +36,14 @@ func parts(p rotate.ProjectInfo) (string, string) {
 }
 
 // setCachedKeyTime is a helper that stores the cached secret UpdatedAt value.
-func setCachedKeyTime(p rotate.ProjectInfo, secret string, upd time.Time) {
-	p.CacheSet(secretUpdatedAt{secret}, upd)
+func setCachedKeyTime(c secret.Cache, secret string, upd time.Time) {
+	c.CacheSet(secretUpdatedAt{secret}, upd)
 }
 
 // getCachedKeyTime is a helper that retrieves the cached secret UpdatedAt
 // value.
-func getCachedKeyTime(p rotate.ProjectInfo, secret string) (time.Time, bool) {
-	t, ok := p.CacheGet(secretUpdatedAt{secret})
+func getCachedKeyTime(c secret.Cache, secret string) (time.Time, bool) {
+	t, ok := c.CacheGet(secretUpdatedAt{secret})
 	if time, typeOk := t.(time.Time); ok && typeOk {
 		return time, true
 	}
@@ -51,8 +52,13 @@ func getCachedKeyTime(p rotate.ProjectInfo, secret string) (time.Time, bool) {
 
 // touchCachedKeyTime is a helper that sets the cached secret UpdatedAt value to
 // now.
-func touchCachedKeyTime(p rotate.ProjectInfo, secret string) {
-	setCachedKeyTime(secret, time.Now())
+func touchCachedKeyTime(c secert.Cache, sec string) {
+	setCachedKeyTime(sec, time.Now())
+}
+
+// Name returns "github action secrets"
+func (c *Client) Name() string {
+	return "github action secrets"
 }
 
 // LastSaved checks for the given key on the given project to see when it was
@@ -60,30 +66,31 @@ func touchCachedKeyTime(p rotate.ProjectInfo, secret string) {
 // it has not been stored previously, it returns the zero value.
 func (c *Client) LastSaved(
 	ctx context.Context,
-	p rotate.ProjectInfo,
+	store secret.Storage,
 	key string,
 ) (time.Time, error) {
-	if upd, ok := getCachedKeyTime(p, key); ok {
+	if upd, ok := getCachedKeyTime(store, key); ok {
 		return upd, nil
 	}
 
-	owner, repo := parts(p.Name())
+	owner, repo := parts(store.Name())
 	logger := config.LoggerFrom(ctx).Sugar()
-	secrets, _, err := c.gc.Actions.ListRepoSecrets(ctx, owner, repo, nil)
+	gsecs, _, err := c.gc.Actions.ListRepoSecrets(ctx, owner, repo, nil)
 	if err != nil {
 		logger.Errorw(
 			"project is missing secret",
-			"project", p.Name(),
+			"client", c.Name(),
+			"store", store.Name(),
 			"secret", key,
 		)
 		return time.Time{}, nil
 	}
 
 	var upd time.Time
-	for _, secret := range secrets.Secrets {
-		setCacheKeyTime(p, secret.Name, secret.UpdatedAt.Time)
-		if secret.Name == key {
-			upd = secret.UpdatedAt.Time
+	for _, gsec := range gsecs.Secrets {
+		setCacheKeyTime(store, gsec.Name, gsec.UpdatedAt.Time)
+		if gsec.Name == key {
+			upd = gsec.UpdatedAt.Time
 		}
 	}
 
@@ -93,19 +100,19 @@ func (c *Client) LastSaved(
 // SaveKeys saves each of the secrets given in the project.
 func (c *Client) SaveKeys(
 	ctx context.Context,
-	p rotate.ProjectInfo,
-	ss rotate.Secrets,
+	store secret.Storage,
+	ss secret.Map,
 ) error {
-	owner, repo := parts(p.Name())
+	owner, repo := parts(store.Name())
 	pubKey, _, err := c.gc.Actions.GetRepoPublicKey(ctx, owner, repo)
 	if err != nil {
-		return fmt.Errorf("gc.Actions.GetRepoPublicKey(%q, %q): %w", owner, repo, err)
+		return fmt.Errorf("failed to retrieve github project public key for project %q: %w", store.Name(), err)
 	}
 
 	keyStr := pubKey.GetKey()
 	decKeyBytes, err := base64.StdEncoding.DecodeString(keyStr)
 	if err != nil {
-		return fmt.Errorf("base64.StdEncoding.DecodeString(): %w", err)
+		return fmt.Errorf("failed to decode github project public key string for project %q: %w", store.Name, err)
 	}
 	keyStr = string(decKeyBytes)
 
@@ -116,14 +123,14 @@ func (c *Client) SaveKeys(
 	}
 
 	logger := config.LoggerFrom(ctx).Sugar()
-	for key, secret := range ss {
-		keyBox := sodium.Bytes([]byte(secret))
+	for key, sec := range ss {
+		keyBox := sodium.Bytes([]byte(sec))
 		keySealed := keyBox.SealedBox(pkBox)
 		keyEncSealed := base64.StdEncoding.EncodeToString(keySealed)
 
 		logger.Debugw(
 			"updating github action secret",
-			"project", p.Name(),
+			"storage", store.Name(),
 			"secret", key,
 		)
 
@@ -132,12 +139,12 @@ func (c *Client) SaveKeys(
 			KeyID:          keyIDStr,
 			EncryptedValue: keyEncSealed,
 		}
-		_, err = r.gc.Actions.CreateOrUpdateRepoSecret(ctx, p.Owner(), p.Repo(), akEncSec)
+		_, err = c.gc.Actions.CreateOrUpdateRepoSecret(ctx, owner, repo, akEncSec)
 		if err != nil {
-			return fmt.Errorf("gc.Actions.CreateOrUpdateRepoSecret(%q, %q, %q): %w", owner, repo, key, err)
+			return fmt.Errorf("failed to create or update github action secret named %q for project %q: %w", key, store.Name(), err)
 		}
 
-		touchCachedKeyTime(p, key)
+		touchCachedKeyTime(store, key)
 	}
 
 	return nil
