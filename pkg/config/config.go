@@ -40,6 +40,8 @@ type StorageMap struct {
 type Secret struct {
 	Name     string       `yaml:"name"`
 	Storages []StorageMap `yaml:"storages"`
+
+	cache map[any]any
 }
 
 // SecretSet is used to difine a set of secret to use with rotation and/or
@@ -89,4 +91,28 @@ func (c *Config) Prepare() error {
 	}
 
 	return nil
+}
+
+func (s *Secret) initCache() {
+	if s.cache == nil {
+		s.cache = make(map[any]any)
+	}
+}
+
+// CacheSet sets a cache key associated with the secret.
+func (s *Secret) CacheSet(k, v any) {
+	s.cache[k] = v
+}
+
+// CacheGet returns a set cache key. The return value from this function is the
+// value set (or the zero value if nothing is set for that key), and a boolean
+// indicating whether a value has been set.
+func (s *Secret) CacheGet(k any) (any, bool) {
+	v, ok := s.cache[k]
+	return v, ok
+}
+
+// CacheClear deletes the cache key.
+func (s *Secret) CacheClear(k any) {
+	delete(s.cache, k)
 }
