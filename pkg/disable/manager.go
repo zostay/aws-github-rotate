@@ -8,14 +8,6 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/iam"
 	"github.com/zostay/aws-github-rotate/pkg/config"
-	"github.com/zostay/aws-github-rotate/pkg/config"
-	"github.com/zostay/aws-github-rotate/pkg/config"
-	"github.com/zostay/aws-github-rotate/pkg/config"
-	"github.com/zostay/aws-github-rotate/pkg/config"
-	"github.com/zostay/aws-github-rotate/pkg/config"
-	"github.com/zostay/aws-github-rotate/pkg/config"
-	"github.com/zostay/aws-github-rotate/pkg/config"
-	"github.com/zostay/aws-github-rotate/pkg/config"
 )
 
 // Manager provides the business logic for detecting whether a secret is old
@@ -31,16 +23,16 @@ type Manager struct {
 }
 
 // New con      structs a new object to perform password disablement.
-func New(      
-	rc Client            ,
-	disableAf                 ter time.Duration,
-	dryRun bo                 ol,
-	secrets [                 ]*config.Secret,
-) *Manager                  {
-	return &M                 anager{
-		client:                  rc,
-		disableA           fter: disableAfter,
-		dryRun:            dryRun,
+func New(
+	rc Client,
+	disableAfter time.Duration,
+	dryRun bool,
+	secrets []*config.Secret,
+) *Manager {
+	return &Manager{
+		client:       rc,
+		disableAfter: disableAfter,
+		dryRun:       dryRun,
 		secrets:      secrets,
 	}
 }
