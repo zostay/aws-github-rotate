@@ -50,7 +50,7 @@ func New(
 // Otherwise, this returns false.
 func (m *Manager) needsRotation(
 	ctx context.Context,
-	s *Secret,
+	s *config.Secret,
 ) bool {
 	logger := config.LoggerFrom(ctx).Sugar()
 
@@ -58,8 +58,8 @@ func (m *Manager) needsRotation(
 	if err != nil {
 		logger.Errorw(
 			"got error while checking last rotation date; skipping",
-			"secret", s.Secret(),
-			"client", client.Name(),
+			"secret", s.Name(),
+			"client", m.client.Name(),
 		)
 		return false
 	}
@@ -67,8 +67,8 @@ func (m *Manager) needsRotation(
 	if time.Since(rotated) > m.rotateAfter {
 		logger.Debugw(
 			"secret is out of date and requires rotation",
-			"secret", s.Seret(),
-			"client", client.Name(),
+			"secret", s.Name(),
+			"client", m.client.Name(),
 			"now_ts", time.Now(),
 			"rotation_ts", rotated,
 			"rotate_after", m.rotateAfter,
@@ -76,7 +76,7 @@ func (m *Manager) needsRotation(
 		return true
 	}
 
-	for _, si := range secret.Storages {
+	for _, si := range s.Storages {
 		store := m.findStorage(si.Storage())
 		for _, storeKey := range si.Keys {
 			saved, err := store.LastSave(ctx, si, storeKey)

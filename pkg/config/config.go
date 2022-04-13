@@ -38,8 +38,8 @@ type StorageMap struct {
 
 // Secret defines a single rotatable secret.
 type Secret struct {
-	Name     string       `yaml:"name"`
-	Storages []StorageMap `yaml:"storages"`
+	SecretName string       `yaml:"name"`
+	Storages   []StorageMap `yaml:"storages"`
 
 	cache map[any]any
 }
@@ -82,11 +82,11 @@ func (c *Config) Prepare() error {
 		secMap := make(map[string]struct{}, len(secSet.Secrets))
 		for j := range secSet.Secrets {
 			sec := &secSet.Secrets[j]
-			if _, alreadyExists := secMap[sec.Name]; alreadyExists {
-				return fmt.Errorf("in set %q, secret named %q is repeated twice in the configuration", secSet.Name, sec.Name)
+			if _, alreadyExists := secMap[sec.SecretName]; alreadyExists {
+				return fmt.Errorf("in set %q, secret named %q is repeated twice in the configuration", secSet.Name, sec.SecretName)
 			}
 
-			secMap[sec.Name] = struct{}{}
+			secMap[sec.SecretName] = struct{}{}
 		}
 	}
 
@@ -97,6 +97,11 @@ func (s *Secret) initCache() {
 	if s.cache == nil {
 		s.cache = make(map[any]any)
 	}
+}
+
+// Name returns the name of the secret.
+func (s *Secret) Name() string {
+	return s.SecretName
 }
 
 // CacheSet sets a cache key associated with the secret.
