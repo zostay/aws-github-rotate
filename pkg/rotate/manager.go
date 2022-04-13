@@ -20,7 +20,7 @@ type Manager struct {
 
 	dryRun bool
 
-	secrets []*Secret
+	secrets []config.Secret
 }
 
 // New constructs a new object to perform password rotation.
@@ -29,13 +29,8 @@ func New(
 	scs Storages,
 	rotateAfter time.Duration,
 	dryRun bool,
-	secrets []*config.Secret,
+	secrets []config.Secret,
 ) *Manager {
-	ss := make([]*Secret, len(secrets))
-	for i, s := range secrets {
-		ss[i] = NewSecret(s)
-	}
-
 	return &Manager{
 		client:      rc,
 		stores:      scs,
