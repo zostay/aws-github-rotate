@@ -15,6 +15,9 @@ type Client struct {
 	Options map[string]any `yaml:"option"`
 }
 
+// ClientList is a map of names to client configurations.
+type ClientList map[string]Client
+
 // Rotation is used to define a rotation process.
 type Rotation struct {
 	Client      string        `yaml:"client"`
@@ -51,12 +54,28 @@ type SecretSet struct {
 	Secrets []Secret `yaml:"secrets"`
 }
 
+// Names returns all the storage client names used in the secret set
+// configuration.
+func (ss *SecretSet) Names() []string {
+	nm := make(map[string]struct{})
+	for _, sec := range ss.Secrets {
+		for _, store := range sec.Storages {
+			nm[store.Storage] = struct{}{}
+		}
+	}
+	names := make([]string, len(nm))
+	for name := range nm {
+		names = append(names, name)
+	}
+	return names
+}
+
 // Config is the programmatic representation of the loaded configuration.
 type Config struct {
-	Clients      map[string]Client `yaml:"clients"`
-	Rotations    []Rotation        `yaml:"rotations"`
-	Disablements []Disablement     `yaml:disablements"`
-	SecretSets   []SecretSet       `yaml:"secret_sets"`
+	Clients      ClientList    `yaml:"clients"`
+	Rotations    []Rotation    `yaml:"rotations"`
+	Disablements []Disablement `yaml:disablements"`
+	SecretSets   []SecretSet   `yaml:"secret_sets"`
 }
 
 // Prepare should be called after the configuration object has been unmarshaled

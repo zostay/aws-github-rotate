@@ -17,6 +17,9 @@ type Instance interface {
 	Name() string
 }
 
+// InstanceList maps strings to constructed instances.
+type InstanceList map[string]Instance
+
 // Builder is the interface that the registered plugins will implement. It
 // simply provides a means for constructing the plugin.
 type Builder interface {
@@ -40,11 +43,11 @@ func Get(pkg string) Builder {
 // Build will construct a plugin instance and return it. If the instance fails
 // during construction, an error will be returned. If no plugin is registered
 // for the given package, an error will be returned.
-func Build(ctx context.Context, pkg string, c *config.Client) (Instance, error) {
-	p := Get(pkg)
+func Build(ctx context.Context, c *config.Client) (Instance, error) {
+	p := Get(c.Package)
 	if p != nil {
 		return p.Build(ctx, c)
 	}
 
-	return nil, fmt.Errorf("no plugin found for package %q", pkg)
+	return nil, fmt.Errorf("no plugin found for package %q", c.Package)
 }
