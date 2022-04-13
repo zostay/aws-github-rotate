@@ -41,7 +41,7 @@ func Get(pkg string) Builder {
 // during construction, an error will be returned. If no plugin is registered
 // for the given package, an error will be returned.
 func Build(ctx context.Context, pkg string, c *config.Client) (Instance, error) {
-	p := registry.Get(pkg)
+	p := Get(pkg)
 	if p != nil {
 		return p.Build(ctx, c)
 	}
