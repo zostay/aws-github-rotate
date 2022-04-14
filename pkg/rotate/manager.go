@@ -33,11 +33,11 @@ func New(
 	scs Storages,
 	rotateAfter time.Duration,
 	dryRun bool,
-	clients config.ClientList,
+	plugins *plugin.Manager,
 	secrets []config.Secret,
 ) *Manager {
 	return &Manager{
-		plugins:     plugin.NewManager(clients),
+		plugins:     plugins,
 		client:      rc,
 		stores:      scs,
 		rotateAfter: rotateAfter,
