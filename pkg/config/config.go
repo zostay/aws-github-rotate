@@ -34,9 +34,15 @@ type Disablement struct {
 
 // StorageMap describes how a secret should be stored when rotated.
 type StorageMap struct {
-	Storage string `yaml:"storage"`
-	Name    string `yaml:"name"`
-	Keys    KeyMap `yaml:"keys"`
+	StorageClient string `yaml:"storage"`
+	StorageName   string `yaml:"name"`
+	Keys          KeyMap `yaml:"keys"`
+
+	cache
+}
+
+func (sm *StorageMap) Name() string {
+	return sm.StorageName
 }
 
 // Secret defines a single rotatable secret.
@@ -44,7 +50,7 @@ type Secret struct {
 	SecretName string       `yaml:"name"`
 	Storages   []StorageMap `yaml:"storages"`
 
-	cache map[any]any
+	cache
 }
 
 // SecretSet is used to difine a set of secret to use with rotation and/or
@@ -60,7 +66,7 @@ func (ss *SecretSet) Names() []string {
 	nm := make(map[string]struct{})
 	for _, sec := range ss.Secrets {
 		for _, store := range sec.Storages {
-			nm[store.Storage] = struct{}{}
+			nm[store.StorageClient] = struct{}{}
 		}
 	}
 	names := make([]string, len(nm))
@@ -101,8 +107,14 @@ func (c *Config) Prepare() error {
 		secMap := make(map[string]struct{}, len(secSet.Secrets))
 		for j := range secSet.Secrets {
 			sec := &secSet.Secrets[j]
+			sec.initCache()
 			if _, alreadyExists := secMap[sec.SecretName]; alreadyExists {
 				return fmt.Errorf("in set %q, secret named %q is repeated twice in the configuration", secSet.Name, sec.SecretName)
+			}
+
+			for k := range sec.Storages {
+				sm := &sec.Storages[k]
+				sm.initCache()
 			}
 
 			secMap[sec.SecretName] = struct{}{}
@@ -112,31 +124,7 @@ func (c *Config) Prepare() error {
 	return nil
 }
 
-func (s *Secret) initCache() {
-	if s.cache == nil {
-		s.cache = make(map[any]any)
-	}
-}
-
 // Name returns the name of the secret.
 func (s *Secret) Name() string {
 	return s.SecretName
-}
-
-// CacheSet sets a cache key associated with the secret.
-func (s *Secret) CacheSet(k, v any) {
-	s.cache[k] = v
-}
-
-// CacheGet returns a set cache key. The return value from this function is the
-// value set (or the zero value if nothing is set for that key), and a boolean
-// indicating whether a value has been set.
-func (s *Secret) CacheGet(k any) (any, bool) {
-	v, ok := s.cache[k]
-	return v, ok
-}
-
-// CacheClear deletes the cache key.
-func (s *Secret) CacheClear(k any) {
-	delete(s.cache, k)
 }

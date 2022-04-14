@@ -109,24 +109,25 @@ func (m *Manager) needsRotation(
 		return true
 	}
 
-	for _, si := range s.Storages {
-		store, err := m.findStorage(ctx, si.Storage())
+	for i := range s.Storages {
+		sm := &s.Storages[i]
+		store, err := m.findStorage(ctx, sm.StorageClient)
 		if err != nil {
 			logger.Errorw(
 				"got error while loading storage plugin; for safety, rotation will be prevented",
 				"secret", s.Name(),
-				"store_name", si.Storage(),
+				"store_name", sm.StorageClient,
 			)
 			return false
 		}
 
-		for _, storeKey := range si.Keys {
-			saved, err := store.LastSave(ctx, si, storeKey)
+		for _, storeKey := range sm.Keys {
+			saved, err := store.LastSaved(ctx, sm, storeKey)
 			if err != nil {
 				logger.Errorw(
 					"got error while checking last storage date; for safety, rotation will be prevented",
 					"secret", s.Name(),
-					"store_name", si.Storage(),
+					"store_name", sm.StorageClient,
 					"store_desc", store.Name(),
 					"store_key", storeKey,
 					"error", err,
@@ -134,11 +135,11 @@ func (m *Manager) needsRotation(
 				return false
 			}
 
-			if saved < rotated {
-				loger.Debugw(
+			if saved.Before(rotated) {
+				logger.Debugw(
 					"secret stored is older than most recent rotation",
-					"secret", s.Secret(),
-					"client", client.Name(),
+					"secret", s.SecretName,
+					"client", m.client.Name(),
 					"storage", store.Name(),
 					"rotation_ts", rotated,
 					"saved_ts", saved,
@@ -153,7 +154,10 @@ func (m *Manager) needsRotation(
 
 // findStorage returns a constructed storage client instance for the given name
 // or an error.
-func (m *Manager) findStorage(ctx context.Context, name string) (Storage, error) {
+func (m *Manager) findStorage(
+	ctx context.Context,
+	name string,
+) (Storage, error) {
 	inst, err := m.plugins.Build(ctx, name)
 	if err != nil {
 		return nil, err
@@ -170,7 +174,10 @@ func (m *Manager) findStorage(ctx context.Context, name string) (Storage, error)
 // rotated by calling needsRotation(). If not, it does nothing further. If so,
 // it tells the rotation client to rotate the secret. It then it saves the newly
 // minted secret in all configured storage locations.
-func (m *Manager) rotateSecret(ctx context.Context, s *Secret) error {
+func (m *Manager) rotateSecret(
+	ctx context.Context,
+	s *config.Secret,
+) error {
 	if !m.needsRotation(ctx, s) {
 		return nil
 	}
@@ -180,10 +187,21 @@ func (m *Manager) rotateSecret(ctx context.Context, s *Secret) error {
 		return fmt.Errorf("RotateSecret(): %w", err)
 	}
 
-	for _, si := range s.Storages {
-		store := m.findStorage(si.Storage())
-		remappedSecret := m.remapKeys(si.Keys(), newSecrets)
-		err := store.SaveKeys(ctx, si, remappedSecret)
+	logger := config.LoggerFrom(ctx).Sugar()
+
+	for _, sm := range s.Storages {
+		store, err := m.findStorage(ctx, sm.StorageClient)
+		if err != nil {
+			logger.Errorw(
+				"got error while loading storage plugin; for safety, rotation will be prevented",
+				"secret", s.Name(),
+				"store_name", sm.StorageClient,
+			)
+			return false
+		}
+
+		remappedSecret := m.remapKeys(sm.Keys(), newSecrets)
+		err := store.SaveKeys(ctx, sm, remappedSecret)
 		if err != nil {
 			logger.Errorw(
 				"failed to update storage with newly rotated secrets",
