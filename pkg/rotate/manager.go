@@ -200,9 +200,12 @@ func (m *Manager) rotateSecret(
 
 	logger := config.LoggerFrom(ctx).Sugar()
 
-	var newSecrets secret.Map
+	var (
+		newSecrets secret.Map
+		err        error
+	)
 	if !m.dryRun {
-		newSecrets, err := m.client.RotateSecret(ctx, s)
+		newSecrets, err = m.client.RotateSecret(ctx, s)
 		if err != nil {
 			return fmt.Errorf("RotateSecret(): %w", err)
 		}
@@ -222,7 +225,7 @@ func (m *Manager) rotateSecret(
 		}
 
 		remappedSecret := remapKeys(sm.Keys, newSecrets)
-		if !dryRun {
+		if !m.dryRun {
 			err = store.SaveKeys(ctx, sm, remappedSecret)
 			if err != nil {
 				logger.Errorw(

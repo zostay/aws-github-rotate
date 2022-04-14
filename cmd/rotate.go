@@ -4,7 +4,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/zostay/aws-github-rotate/pkg/config"
-	"github.com/zostay/aws-github-rotate/pkg/disable"
 	"github.com/zostay/aws-github-rotate/pkg/plugin"
 	"github.com/zostay/aws-github-rotate/pkg/rotate"
 )
@@ -30,6 +29,11 @@ func RunRotation(cmd *cobra.Command, args []string) {
 	buildMgr := plugin.NewManager(c.Clients)
 	for _, r := range c.Rotations {
 		RunRotations(buildMgr, &r)
+	}
+	if alsoDisable {
+		for _, r := range c.Disablements {
+			RunDisablement(buildMgr, &r)
+		}
 	}
 }
 
@@ -77,26 +81,5 @@ func RunRotations(
 			"client_desc", rotCli.Name(),
 			"error", err,
 		)
-	}
-
-	// TODO Copy and paste here is reprehensible.
-	// "Use a function call, fool!" -- Mr. T
-	if alsoDisable {
-		m := disable.New(
-			disCli,
-			d.DisableAfter,
-			dryRun,
-			secretSet.Secrets,
-		)
-
-		err = m.DisableSecrets(ctx)
-		if err != nil {
-			slog.Errorw(
-				"failed to complete secret disablement",
-				"client_name", d.DisableClient,
-				"client_desc", dc.Name(),
-				"error", err,
-			)
-		}
 	}
 }
