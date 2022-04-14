@@ -7,6 +7,7 @@ import (
 
 	"github.com/zostay/aws-github-rotate/pkg/config"
 	"github.com/zostay/aws-github-rotate/pkg/plugin"
+	"github.com/zostay/aws-github-rotate/pkg/secret"
 )
 
 // Manager provides the business logic for detecting whether secrets in the
@@ -170,6 +171,24 @@ func (m *Manager) findStorage(
 	return nil, fmt.Errorf("expected storage plugin for client named %q, but got %T instead", name, inst)
 }
 
+// remapKeys will rewrite the keys of the incoming map according to the given
+// key map. Original keys will be kept as-is unless remapped. A remapped key,
+// however, will be removed from the original.
+func remapKeys(
+	keyMap config.KeyMap,
+	secrets secret.Map,
+) secret.Map {
+	remapSecrets := make(secret.Map, len(secrets))
+	for k, v := range secrets {
+		if newK, ok := keyMap[k]; ok {
+			remapSecrets[newK] = v
+		} else {
+			remapSecrets[k] = v
+		}
+	}
+	return remapSecrets
+}
+
 // rotateSecret rotates a single secret. It checks if the secret needs to be
 // rotated by calling needsRotation(). If not, it does nothing further. If so,
 // it tells the rotation client to rotate the secret. It then it saves the newly
@@ -189,19 +208,15 @@ func (m *Manager) rotateSecret(
 
 	logger := config.LoggerFrom(ctx).Sugar()
 
-	for _, sm := range s.Storages {
+	for i := range s.Storages {
+		sm := &s.Storages[i]
 		store, err := m.findStorage(ctx, sm.StorageClient)
 		if err != nil {
-			logger.Errorw(
-				"got error while loading storage plugin; for safety, rotation will be prevented",
-				"secret", s.Name(),
-				"store_name", sm.StorageClient,
-			)
-			return false
+			return fmt.Errorf("error while loading storage plugin %q: %w", sm.StorageClient, err)
 		}
 
-		remappedSecret := m.remapKeys(sm.Keys(), newSecrets)
-		err := store.SaveKeys(ctx, sm, remappedSecret)
+		remappedSecret := remapKeys(sm.Keys, newSecrets)
+		err = store.SaveKeys(ctx, sm, remappedSecret)
 		if err != nil {
 			logger.Errorw(
 				"failed to update storage with newly rotated secrets",
@@ -211,10 +226,6 @@ func (m *Manager) rotateSecret(
 				"error", err,
 			)
 		}
-	}
-	err = r.updateGithub(ctx, ak, sk, p)
-	if err != nil {
-		return fmt.Errorf("updateSecrets(): %w", err)
 	}
 
 	return nil
@@ -228,8 +239,9 @@ func (m *Manager) rotateSecret(
 // Each rotation that is needed is performed and all storages associated with
 // each rotation are updated.
 func (m *Manager) RotateSecrets(ctx context.Context) error {
-	logger := config.LoggerFrom(ctx)
-	for _, s := range m.Secrets {
+	logger := config.LoggerFrom(ctx).Sugar()
+	for i := range m.secrets {
+		s := &m.secrets[i]
 		logger.Debugw(
 			"examining secret for rotation",
 			"secret", s.Name(),
