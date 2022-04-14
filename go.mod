@@ -11,6 +11,7 @@ require (
 )
 
 require (
+	github.com/google/go-github v17.0.0+incompatible
 	github.com/spf13/viper v1.10.1
 	go.uber.org/zap v1.21.0
 )

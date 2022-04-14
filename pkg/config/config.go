@@ -10,9 +10,9 @@ type KeyMap map[string]string
 
 // Client is used to load plugins the implement various client interfaces.
 type Client struct {
-	Name    string         `yaml:"-"`
-	Package string         `yaml:"package"`
-	Options map[string]any `yaml:"option"`
+	Name    string         `mapstructure:"-"`
+	Package string         `mapstructure:"package"`
+	Options map[string]any `mapstructure:"option"`
 }
 
 // ClientList is a map of names to client configurations.
@@ -20,23 +20,23 @@ type ClientList map[string]Client
 
 // Rotation is used to define a rotation process.
 type Rotation struct {
-	RotateClient string        `yaml:"client"`
-	RotateAfter  time.Duration `yaml:"rotate_after"`
-	SecretSet    string        `yaml:"secret_set"`
+	RotateClient string        `mapstructure:"client"`
+	RotateAfter  time.Duration `mapstructure:"rotate_after"`
+	SecretSet    string        `mapstructure:"secret_set"`
 }
 
 // Disablement is used to define a disablement process.
 type Disablement struct {
-	DisableClient string        `yaml:"client"`
-	DisableAfter  time.Duration `yaml:"disable_after"`
-	SecretSet     string        `yaml:"secret_set"`
+	DisableClient string        `mapstructure:"client"`
+	DisableAfter  time.Duration `mapstructure:"disable_after"`
+	SecretSet     string        `mapstructure:"secret_set"`
 }
 
 // StorageMap describes how a secret should be stored when rotated.
 type StorageMap struct {
-	StorageClient string `yaml:"storage"`
-	StorageName   string `yaml:"name"`
-	Keys          KeyMap `yaml:"keys"`
+	StorageClient string `mapstructure:"storage"`
+	StorageName   string `mapstructure:"name"`
+	Keys          KeyMap `mapstructure:"keys"`
 
 	cache
 }
@@ -47,8 +47,8 @@ func (sm *StorageMap) Name() string {
 
 // Secret defines a single rotatable secret.
 type Secret struct {
-	SecretName string       `yaml:"name"`
-	Storages   []StorageMap `yaml:"storages"`
+	SecretName string       `mapstructure:"secret"`
+	Storages   []StorageMap `mapstructure:"storages"`
 
 	cache
 }
@@ -56,8 +56,8 @@ type Secret struct {
 // SecretSet is used to difine a set of secret to use with rotation and/or
 // disablement processes.
 type SecretSet struct {
-	Name    string   `yaml:"name"`
-	Secrets []Secret `yaml:"secrets"`
+	Name    string   `mapstructure:"name"`
+	Secrets []Secret `mapstructure:"secrets"`
 }
 
 // Names returns all the storage client names used in the secret set
@@ -78,10 +78,10 @@ func (ss *SecretSet) Names() []string {
 
 // Config is the programmatic representation of the loaded configuration.
 type Config struct {
-	Clients      ClientList    `yaml:"clients"`
-	Rotations    []Rotation    `yaml:"rotations"`
-	Disablements []Disablement `yaml:disablements"`
-	SecretSets   []SecretSet   `yaml:"secret_sets"`
+	Clients      ClientList    `mapstructure:"plugins"`
+	Rotations    []Rotation    `mapstructure:"rotations"`
+	Disablements []Disablement `mapstructure:disablements"`
+	SecretSets   []SecretSet   `mapstructure:"secret_sets"`
 }
 
 // Prepare should be called after the configuration object has been unmarshaled

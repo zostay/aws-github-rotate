@@ -3,6 +3,7 @@ package plugin
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/zostay/aws-github-rotate/pkg/config"
 )
@@ -24,7 +25,8 @@ func (m *Manager) Build(ctx context.Context, name string) (Instance, error) {
 		return inst, nil
 	}
 
-	c, ok := m.clients[name]
+	lcname := strings.ToLower(name)
+	c, ok := m.clients[lcname]
 	if !ok {
 		return nil, fmt.Errorf("no plugin configuration found for name %q", name)
 	}

@@ -1,5 +1,5 @@
 ---
-clients:
+plugins:
   github:
     package: github.com/zostay/aws-github-rotate/pkg/plugin/github
   IAM:
