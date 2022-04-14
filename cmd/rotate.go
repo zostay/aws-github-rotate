@@ -38,41 +38,42 @@ func RunRotations(
 ) {
 	slog := logger.Sugar()
 
-	rc, err := buildMgr.Build(ctx, c.Client)
-	if rotCli, ok := rc.(rotate.Client); !ok {
+	rc, err := buildMgr.Build(ctx, r.RotateClient)
+	rotCli, ok := rc.(rotate.Client)
+	if !ok {
 		slog.Errorw(
 			"failed to load rotation client",
-			"client_name", c.Client.Name,
+			"client_name", r.RotateClient,
 			"error", err,
 		)
 		return
 	}
 
-	secretSet, err := findSecretSet(d.SecretSet)
+	secretSet, err := findSecretSet(r.SecretSet)
 	if err != nil {
 		slog.Errorw(
 			"failed to locate the secret set to work with ",
-			"client_name", c.Client.Name,
-			"client_desc", dc.Name(),
+			"client_name", r.RotateClient,
+			"client_desc", rotCli.Name(),
 			"error", err,
 		)
 		return
 	}
 
 	m := rotate.New(
-		rc,
-		c.rotateAfter,
+		rotCli,
+		r.RotateAfter,
 		dryRun,
 		buildMgr,
 		secretSet.Secrets,
 	)
 
-	err := m.RotateSecrets(ctx)
+	err = m.RotateSecrets(ctx)
 	if err != nil {
 		slog.Errorw(
 			"failed to complete secret rotation",
-			"client_name", c.Client.Name,
-			"client_desc", dc.Name(),
+			"client_name", r.RotateClient,
+			"client_desc", rotCli.Name(),
 			"error", err,
 		)
 	}

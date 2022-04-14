@@ -33,7 +33,7 @@ func init() {
 	viper.SetDefault("DisableAfter", 48*time.Hour)
 
 	rootCmd.PersistentFlags().BoolVar(
-		&devMode, "dev-mode",
+		&devMode, "dev-mode", false,
 		"turns on developer mode logging",
 	)
 	rootCmd.PersistentFlags().StringVar(
@@ -72,7 +72,6 @@ func init() {
 }
 
 func initContext() {
-	var err error
 	if devMode {
 		logger = config.DevelopmentLogger()
 	} else {

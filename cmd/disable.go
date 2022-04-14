@@ -34,11 +34,12 @@ func RunDisablement(
 ) {
 	slog := logger.Sugar()
 
-	dc, err := buildMgr.Build(ctx, c.Client)
-	if disCli, ok := dc.(disable.Client); !ok {
+	dc, err := buildMgr.Build(ctx, d.DisableClient)
+	disCli, ok := dc.(disable.Client)
+	if !ok {
 		slog.Errorw(
 			"failed to load disable client",
-			"client_name", c.Client.Name,
+			"client_name", d.DisableClient,
 			"error", err,
 		)
 		return
@@ -48,25 +49,25 @@ func RunDisablement(
 	if err != nil {
 		slog.Errorw(
 			"failed to locate the secret set to work with ",
-			"client_name", c.Client.Name,
-			"client_desc", dc.Name(),
+			"client_name", d.DisableClient,
+			"client_desc", disCli.Name(),
 			"error", err,
 		)
 		return
 	}
 
 	m := disable.New(
-		dc,
-		c.disableAfter,
+		disCli,
+		d.DisableAfter,
 		dryRun,
 		secretSet.Secrets,
 	)
 
-	err := m.DisableSecrets(ctx)
+	err = m.DisableSecrets(ctx)
 	if err != nil {
 		slog.Errorw(
 			"failed to complete secret disablement",
-			"client_name", c.Client.Name,
+			"client_name", d.DisableClient,
 			"client_desc", dc.Name(),
 			"error", err,
 		)

@@ -20,16 +20,16 @@ type ClientList map[string]Client
 
 // Rotation is used to define a rotation process.
 type Rotation struct {
-	Client      string        `yaml:"client"`
-	RotateAfter time.Duration `yaml:"rotate_after"`
-	SecretSet   string        `yaml:"secret_set"`
+	RotateClient string        `yaml:"client"`
+	RotateAfter  time.Duration `yaml:"rotate_after"`
+	SecretSet    string        `yaml:"secret_set"`
 }
 
 // Disablement is used to define a disablement process.
 type Disablement struct {
-	Client       string        `yaml:"client"`
-	DisableAfter time.Duration `yaml:"disable_after"`
-	SecretSet    string        `yaml:"secret_set"`
+	DisableClient string        `yaml:"client"`
+	DisableAfter  time.Duration `yaml:"disable_after"`
+	SecretSet     string        `yaml:"secret_set"`
 }
 
 // StorageMap describes how a secret should be stored when rotated.
