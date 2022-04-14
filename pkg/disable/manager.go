@@ -17,7 +17,7 @@ type Manager struct {
 
 	dryRun bool
 
-	secrets []*config.Secret
+	secrets []config.Secret
 }
 
 // New con      structs a new object to perform password disablement.
@@ -25,7 +25,7 @@ func New(
 	rc Client,
 	disableAfter time.Duration,
 	dryRun bool,
-	secrets []*config.Secret,
+	secrets []config.Secret,
 ) *Manager {
 	return &Manager{
 		client:       rc,
@@ -90,7 +90,7 @@ func (m *Manager) disableSecret(ctx context.Context, s *config.Secret) error {
 func (m *Manager) DisableSecrets(ctx context.Context) error {
 	logger := config.LoggerFrom(ctx).Sugar()
 	for k := range m.secrets {
-		s := m.secrets[k]
+		s := &m.secrets[k]
 		logger.Debugw(
 			"examining secret for disablement",
 			"secret", s.SecretName,

@@ -18,7 +18,6 @@ type Manager struct {
 	plugins *plugin.Manager
 
 	client Client
-	stores Storages
 
 	rotateAfter time.Duration
 
@@ -30,7 +29,6 @@ type Manager struct {
 // New constructs a new object to perform password rotation.
 func New(
 	rc Client,
-	scs Storages,
 	rotateAfter time.Duration,
 	dryRun bool,
 	plugins *plugin.Manager,
@@ -39,7 +37,6 @@ func New(
 	return &Manager{
 		plugins:     plugins,
 		client:      rc,
-		stores:      scs,
 		rotateAfter: rotateAfter,
 		dryRun:      dryRun,
 		secrets:     secrets,
