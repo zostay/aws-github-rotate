@@ -8,6 +8,7 @@ import (
 )
 
 type Client interface {
+	Name() string
 	LastUpdated(context.Context, secret.Info) (time.Time, error)
 	DisableSecret(context.Context, secret.Info) error
 }

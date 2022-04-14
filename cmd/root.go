@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -17,7 +18,7 @@ var (
 	verbose bool
 	devMode bool
 	logger  *zap.Logger
-	ctx context.Context
+	ctx     context.Context
 )
 
 func init() {

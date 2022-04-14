@@ -2,7 +2,7 @@ package cmd
 
 import (
 	"github.com/spf13/cobra"
-	"github.com/zostay/aws-github-rotate/pkg/rotate"
+	"github.com/zostay/aws-github-rotate/pkg/disable"
 )
 
 var (
@@ -21,11 +21,6 @@ func initDisableCmd() {
 
 func RunDisable(cmd *cobra.Command, args []string) {
 	slog := logger.Sugar()
-
-	err := loadPlugins(ctx, c.Clients)
-	if err != nil {
-		slog.Fatal(err)
-	}
 
 	m := disable.New(
 		gc, svcIam,

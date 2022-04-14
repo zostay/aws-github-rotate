@@ -13,7 +13,7 @@ import (
 type Manager struct {
 	client Client
 
-	disableAfter time.Duaration
+	disableAfter time.Duration
 
 	dryRun bool
 
@@ -39,7 +39,7 @@ func New(
 // disableAfter in the past.
 func (m *Manager) needsDisablement(
 	ctx context.Context,
-	s *Secret,
+	s *config.Secret,
 ) bool {
 	logger := config.LoggerFrom(ctx).Sugar()
 
@@ -47,8 +47,8 @@ func (m *Manager) needsDisablement(
 	if err != nil {
 		logger.Errorw(
 			"got error while checking last update date for disablement; skipping",
-			"secret", s.Secret(),
-			"client", client.Name(),
+			"secret", s.SecretName,
+			"client", m.client.Name(),
 		)
 		return false
 	}
@@ -57,8 +57,8 @@ func (m *Manager) needsDisablement(
 	if hasNeed {
 		logger.Debugw(
 			"secret is active and old enough to require disablement",
-			"secret", s.Secret(),
-			"client", client.Name(),
+			"secret", s.SecretName,
+			"client", m.client.Name(),
 			"now_ts", time.Now(),
 			"update_ts", updateDate,
 			"disable_after", m.disableAfter,
@@ -74,11 +74,11 @@ func (m *Manager) disableSecret(ctx context.Context, s *config.Secret) error {
 		return nil
 	}
 
-	err := m.DisableSecret(ctx, s)
+	err := m.client.DisableSecret(ctx, s)
 	if err != nil {
 		return fmt.Errorf(
 			"failed to disable old active secret",
-			"secret", s.Secret(),
+			"secret", s.SecretName,
 			"client", m.client.Name(),
 		)
 	}
@@ -88,14 +88,24 @@ func (m *Manager) disableSecret(ctx context.Context, s *config.Secret) error {
 // DisableSecrets examines all the IAM keys and disables any of the
 // non-active keys that have surpassed the maxActiveAge.
 func (m *Manager) DisableSecrets(ctx context.Context) error {
-	for k := range r.secrets {
+	logger := config.LoggerFrom(ctx).Sugar()
+	for k := range m.secrets {
+		s := m.secrets[k]
 		logger.Debugw(
 			"examining secret for disablement",
-			"secret", s.Name(),
+			"secret", s.SecretName,
 			"client", m.client.Name(),
 		)
 
 		err := m.disableSecret(ctx, s)
+		if err != nil {
+			logger.Errorw(
+				"failed to disable secret",
+				"secret", s.SecretName,
+				"client", m.client.Name(),
+			)
+			continue
+		}
 	}
 
 	return nil
