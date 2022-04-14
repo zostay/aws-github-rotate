@@ -198,12 +198,21 @@ func (m *Manager) rotateSecret(
 		return nil
 	}
 
-	newSecrets, err := m.client.RotateSecret(ctx, s)
-	if err != nil {
-		return fmt.Errorf("RotateSecret(): %w", err)
-	}
-
 	logger := config.LoggerFrom(ctx).Sugar()
+
+	var newSecrets secret.Map
+	if !m.dryRun {
+		newSecrets, err := m.client.RotateSecret(ctx, s)
+		if err != nil {
+			return fmt.Errorf("RotateSecret(): %w", err)
+		}
+	} else {
+		logger.Infow(
+			"dry run: here's where the secret should get rotated",
+			"secret", s.Name(),
+			"client", m.client.Name(),
+		)
+	}
 
 	for i := range s.Storages {
 		sm := &s.Storages[i]
@@ -213,16 +222,26 @@ func (m *Manager) rotateSecret(
 		}
 
 		remappedSecret := remapKeys(sm.Keys, newSecrets)
-		err = store.SaveKeys(ctx, sm, remappedSecret)
-		if err != nil {
-			logger.Errorw(
-				"failed to update storage with newly rotated secrets",
+		if !dryRun {
+			err = store.SaveKeys(ctx, sm, remappedSecret)
+			if err != nil {
+				logger.Errorw(
+					"failed to update storage with newly rotated secrets",
+					"secret", s.Name(),
+					"client", m.client.Name(),
+					"store", store.Name(),
+					"error", err,
+				)
+			}
+		} else {
+			logger.Infow(
+				"dry run: here's where the secret should get stored",
 				"secret", s.Name(),
 				"client", m.client.Name(),
 				"store", store.Name(),
-				"error", err,
 			)
 		}
+
 	}
 
 	return nil

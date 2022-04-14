@@ -97,14 +97,22 @@ func (m *Manager) DisableSecrets(ctx context.Context) error {
 			"client", m.client.Name(),
 		)
 
-		err := m.disableSecret(ctx, s)
-		if err != nil {
-			logger.Errorw(
-				"failed to disable secret",
-				"secret", s.SecretName,
+		if !m.dryRun {
+			err := m.disableSecret(ctx, s)
+			if err != nil {
+				logger.Errorw(
+					"failed to disable secret",
+					"secret", s.SecretName,
+					"client", m.client.Name(),
+				)
+				continue
+			}
+		} else {
+			logger.Infow(
+				"dry run: here's where the old secret should get disable",
+				"secret", s.Name(),
 				"client", m.client.Name(),
 			)
-			continue
 		}
 	}
 
