@@ -25,7 +25,7 @@ func (b *builder) Build(ctx context.Context, c *config.Client) (plugin.Instance,
 	)
 	oc := oauth2.NewClient(ctx, ts)
 	gc := github.NewClient(oc)
-	return &Client{gc}
+	return &Client{gc}, nil
 }
 
 func init() {

@@ -7,10 +7,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/go-github/github"
+	"github.com/google/go-github/v42/github"
 	"github.com/jamesruan/sodium"
 	"github.com/zostay/aws-github-rotate/pkg/config"
-	"github.com/zostay/aws-github-rotate/pkg/rotate"
 	"github.com/zostay/aws-github-rotate/pkg/secret"
 )
 
@@ -30,8 +29,8 @@ type Client struct {
 
 // parts splits a project name into the owner/repo form used for github
 // projects.
-func parts(p rotate.ProjectInfo) (string, string) {
-	o, r, _ := strings.Cut(p.Name(), "/")
+func parts(s secret.Storage) (string, string) {
+	o, r, _ := strings.Cut(s.Name(), "/")
 	return o, r
 }
 
@@ -52,8 +51,8 @@ func getCachedKeyTime(c secret.Cache, secret string) (time.Time, bool) {
 
 // touchCachedKeyTime is a helper that sets the cached secret UpdatedAt value to
 // now.
-func touchCachedKeyTime(c secert.Cache, sec string) {
-	setCachedKeyTime(sec, time.Now())
+func touchCachedKeyTime(c secret.Cache, sec string) {
+	setCachedKeyTime(c, sec, time.Now())
 }
 
 // Name returns "github action secrets"
@@ -73,7 +72,7 @@ func (c *Client) LastSaved(
 		return upd, nil
 	}
 
-	owner, repo := parts(store.Name())
+	owner, repo := parts(store)
 	logger := config.LoggerFrom(ctx).Sugar()
 	gsecs, _, err := c.gc.Actions.ListRepoSecrets(ctx, owner, repo, nil)
 	if err != nil {
