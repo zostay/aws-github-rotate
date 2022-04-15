@@ -17,6 +17,7 @@ type Manager struct {
 func NewManager(clients config.ClientList) *Manager {
 	return &Manager{
 		clients: clients,
+		cache:   make(map[string]Instance, len(clients)),
 	}
 }
 
