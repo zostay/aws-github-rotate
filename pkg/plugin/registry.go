@@ -26,7 +26,7 @@ type Builder interface {
 	Build(ctx context.Context, c *config.Client) (Instance, error)
 }
 
-var registry map[string]Builder
+var registry = make(map[string]Builder)
 
 // Register should be called during package initialization to add a plugin
 // package to the registered list of plugins. The Go package name is preferred
