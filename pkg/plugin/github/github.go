@@ -87,7 +87,7 @@ func (c *Client) LastSaved(
 
 	var upd time.Time
 	for _, gsec := range gsecs.Secrets {
-		setCacheKeyTime(store, gsec.Name, gsec.UpdatedAt.Time)
+		setCachedKeyTime(store, gsec.Name, gsec.UpdatedAt.Time)
 		if gsec.Name == key {
 			upd = gsec.UpdatedAt.Time
 		}
@@ -102,7 +102,7 @@ func (c *Client) SaveKeys(
 	store secret.Storage,
 	ss secret.Map,
 ) error {
-	owner, repo := parts(store.Name())
+	owner, repo := parts(store)
 	pubKey, _, err := c.gc.Actions.GetRepoPublicKey(ctx, owner, repo)
 	if err != nil {
 		return fmt.Errorf("failed to retrieve github project public key for project %q: %w", store.Name(), err)
@@ -138,7 +138,7 @@ func (c *Client) SaveKeys(
 			KeyID:          keyIDStr,
 			EncryptedValue: keyEncSealed,
 		}
-		_, err = c.gc.Actions.CreateOrUpdateRepoSecret(ctx, owner, repo, akEncSec)
+		_, err = c.gc.Actions.CreateOrUpdateRepoSecret(ctx, owner, repo, encSec)
 		if err != nil {
 			return fmt.Errorf("failed to create or update github action secret named %q for project %q: %w", key, store.Name(), err)
 		}

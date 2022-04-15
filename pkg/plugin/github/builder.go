@@ -5,7 +5,7 @@ import (
 	"os"
 	"reflect"
 
-	"github.com/google/go-github/github"
+	"github.com/google/go-github/v42/github"
 	"github.com/zostay/aws-github-rotate/pkg/config"
 	"github.com/zostay/aws-github-rotate/pkg/plugin"
 	"golang.org/x/oauth2"

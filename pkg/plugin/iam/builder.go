@@ -19,7 +19,7 @@ func (b *builder) Build(ctx context.Context, c *config.Client) (plugin.Instance,
 	session := session.Must(session.NewSession())
 	svcIam := iam.New(session)
 
-	return &Client{svcIam}
+	return &Client{svcIam}, nil
 }
 
 func init() {

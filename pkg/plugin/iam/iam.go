@@ -50,7 +50,7 @@ func setCache(c secret.Cache, oldKey, newKey *iam.AccessKeyMetadata) {
 }
 
 // Name returns "AWS IAM"
-func Name() string {
+func (c *Client) Name() string {
 	return "AWS IAM"
 }
 
@@ -85,7 +85,7 @@ func (c *Client) RotateSecret(
 		"secret", sec.Name(),
 	)
 
-	oldKey, newKey, err := c.getAccessKeys(ctx, u)
+	oldKey, newKey, err := c.getAccessKeys(ctx, sec)
 	if err != nil {
 		return secret.Map{}, fmt.Errorf("failed to retrieve IAM access key metadata for IAM user %q: %w", sec.Name(), err)
 	}
@@ -99,22 +99,20 @@ func (c *Client) RotateSecret(
 	}
 
 	if oldKey != nil && oak != nak {
-		if !r.dryRun {
-			clearCache(sec)
-			_, err := r.svcIam.DeleteAccessKey(
-				&iam.DeleteAccessKeyInput{
-					UserName:    aws.String(sec.Name()),
-					AccessKeyId: oldKey.AccessKeyId,
-				},
-			)
-			if err != nil {
-				return secret.Map{}, fmt.Errorf("failed to delete old access key for IAM user %q: %w", sec.Name(), err)
-			}
+		clearCache(sec)
+		_, err := c.svcIam.DeleteAccessKey(
+			&iam.DeleteAccessKeyInput{
+				UserName:    aws.String(sec.Name()),
+				AccessKeyId: oldKey.AccessKeyId,
+			},
+		)
+		if err != nil {
+			return secret.Map{}, fmt.Errorf("failed to delete old access key for IAM user %q: %w", sec.Name(), err)
 		}
 	}
 
 	var accessKey, secretKey string
-	clearCache(u)
+	clearCache(sec)
 	ck, err := c.svcIam.CreateAccessKey(
 		&iam.CreateAccessKeyInput{
 			UserName: aws.String(sec.Name()),
