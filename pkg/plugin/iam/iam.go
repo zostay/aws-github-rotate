@@ -80,7 +80,7 @@ func (c *Client) RotateSecret(
 ) (secret.Map, error) {
 	logger := config.LoggerFrom(ctx).Sugar()
 	logger.Infow(
-		"rotating IAM account for %s",
+		"rotating IAM account",
 		"client", c.Name(),
 		"secret", sec.Name(),
 	)
