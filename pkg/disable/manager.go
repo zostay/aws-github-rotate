@@ -74,9 +74,18 @@ func (m *Manager) disableSecret(ctx context.Context, s *config.Secret) error {
 		return nil
 	}
 
-	err := m.client.DisableSecret(ctx, s)
-	if err != nil {
-		return fmt.Errorf("failed to disable old active secret %q for disabler %q", s.SecretName, m.client.Name())
+	if !m.dryRun {
+		err := m.client.DisableSecret(ctx, s)
+		if err != nil {
+			return fmt.Errorf("failed to disable old active secret %q for disabler %q", s.SecretName, m.client.Name())
+		}
+	} else {
+		logger := config.LoggerFrom(ctx).Sugar()
+		logger.Infow(
+			"dry run: here's where the old secret should get disable",
+			"secret", s.Name(),
+			"client", m.client.Name(),
+		)
 	}
 	return nil
 }
@@ -93,22 +102,14 @@ func (m *Manager) DisableSecrets(ctx context.Context) error {
 			"client", m.client.Name(),
 		)
 
-		if !m.dryRun {
-			err := m.disableSecret(ctx, s)
-			if err != nil {
-				logger.Errorw(
-					"failed to disable secret",
-					"secret", s.SecretName,
-					"client", m.client.Name(),
-				)
-				continue
-			}
-		} else {
-			logger.Infow(
-				"dry run: here's where the old secret should get disable",
-				"secret", s.Name(),
+		err := m.disableSecret(ctx, s)
+		if err != nil {
+			logger.Errorw(
+				"failed to disable secret",
+				"secret", s.SecretName,
 				"client", m.client.Name(),
 			)
+			continue
 		}
 	}
 
