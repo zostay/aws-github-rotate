@@ -156,7 +156,7 @@ func (m *Manager) findStorage(
 	ctx context.Context,
 	name string,
 ) (Storage, error) {
-	inst, err := m.plugins.Build(ctx, name)
+	inst, err := m.plugins.Instance(ctx, name)
 	if err != nil {
 		return nil, err
 	}

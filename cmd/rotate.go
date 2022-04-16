@@ -43,7 +43,7 @@ func RunRotations(
 ) {
 	slog := logger.Sugar()
 
-	rc, err := buildMgr.Build(ctx, r.RotateClient)
+	rc, err := buildMgr.Instance(ctx, r.RotateClient)
 	rotCli, ok := rc.(rotate.Client)
 	if !ok {
 		slog.Errorw(

@@ -34,7 +34,7 @@ func RunDisablement(
 ) {
 	slog := logger.Sugar()
 
-	dc, err := buildMgr.Build(ctx, d.DisableClient)
+	dc, err := buildMgr.Instance(ctx, d.DisableClient)
 	disCli, ok := dc.(disable.Client)
 	if !ok {
 		slog.Errorw(

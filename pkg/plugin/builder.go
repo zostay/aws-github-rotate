@@ -21,7 +21,7 @@ func NewManager(clients config.ClientList) *Manager {
 	}
 }
 
-func (m *Manager) Build(ctx context.Context, name string) (Instance, error) {
+func (m *Manager) Instance(ctx context.Context, name string) (Instance, error) {
 	if inst, ok := m.cache[name]; ok {
 		return inst, nil
 	}
