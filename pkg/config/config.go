@@ -41,6 +41,8 @@ type StorageMap struct {
 	cache
 }
 
+// Name returns the configured name where the the storage plugin is expected to
+// store the data.
 func (sm *StorageMap) Name() string {
 	return sm.StorageName
 }
