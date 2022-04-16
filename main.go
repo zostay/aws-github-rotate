@@ -1,3 +1,4 @@
+// Package main causes plugins to be loaded and compiled in.
 package main
 
 import (
@@ -6,6 +7,7 @@ import (
 	_ "github.com/zostay/aws-github-rotate/pkg/plugin/iam"
 )
 
+// main executes the command.
 func main() {
 	cmd.Execute()
 }

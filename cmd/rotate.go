@@ -13,6 +13,7 @@ var (
 	alsoDisable bool
 )
 
+// initRotateCmd configures the command.
 func initRotateCmd() {
 	rotateCmd = &cobra.Command{
 		Use:   "rotate",
@@ -25,6 +26,9 @@ func initRotateCmd() {
 	rootCmd.AddCommand(rotateCmd)
 }
 
+// RunRotation performs all the rotations configured according to the command
+// line given. It may also trigger disablement, if the --also-disable option is
+// set.
 func RunRotation(cmd *cobra.Command, args []string) {
 	buildMgr := plugin.NewManager(c.Plugins)
 	for _, r := range c.Rotations {
@@ -37,6 +41,7 @@ func RunRotation(cmd *cobra.Command, args []string) {
 	}
 }
 
+// RunRotations performs a single rotation from the configuration.
 func RunRotations(
 	buildMgr *plugin.Manager,
 	r *config.Rotation,

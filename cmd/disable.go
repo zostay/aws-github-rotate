@@ -11,6 +11,7 @@ var (
 	disableCmd *cobra.Command
 )
 
+// initDisableCmd configures the command.
 func initDisableCmd() {
 	disableCmd = &cobra.Command{
 		Use:   "disable",
@@ -21,6 +22,9 @@ func initDisableCmd() {
 	rootCmd.AddCommand(disableCmd)
 }
 
+// RunDisable performs disablement according to the command-line arguments
+// given and the configuration. All configured disablements are run via this
+// function.
 func RunDisable(cmd *cobra.Command, args []string) {
 	buildMgr := plugin.NewManager(c.Plugins)
 	for _, d := range c.Disablements {
@@ -28,6 +32,7 @@ func RunDisable(cmd *cobra.Command, args []string) {
 	}
 }
 
+// RunDisablement performs disablement for a single configured disablement.
 func RunDisablement(
 	buildMgr *plugin.Manager,
 	d *config.Disablement,
