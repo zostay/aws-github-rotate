@@ -62,22 +62,6 @@ type SecretSet struct {
 	Secrets []Secret `mapstructure:"secrets"`
 }
 
-// Names returns all the storage client names used in the secret set
-// configuration.
-func (ss *SecretSet) Names() []string {
-	nm := make(map[string]struct{})
-	for _, sec := range ss.Secrets {
-		for _, store := range sec.Storages {
-			nm[store.StorageClient] = struct{}{}
-		}
-	}
-	names := make([]string, len(nm))
-	for name := range nm {
-		names = append(names, name)
-	}
-	return names
-}
-
 // Config is the programmatic representation of the loaded configuration.
 type Config struct {
 	Plugins      PluginList    `mapstructure:"plugins"`
