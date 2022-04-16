@@ -22,7 +22,7 @@ func initDisableCmd() {
 }
 
 func RunDisable(cmd *cobra.Command, args []string) {
-	buildMgr := plugin.NewManager(c.Clients)
+	buildMgr := plugin.NewManager(c.Plugins)
 	for _, d := range c.Disablements {
 		RunDisablement(buildMgr, &d)
 	}

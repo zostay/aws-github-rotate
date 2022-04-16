@@ -8,15 +8,15 @@ import (
 // KeyMap maps the keys produced by the source rotator to the keys to use in storage.
 type KeyMap map[string]string
 
-// Client is used to load plugins the implement various client interfaces.
-type Client struct {
+// Plugin is used to load plugins the implement various client interfaces.
+type Plugin struct {
 	Name    string         `mapstructure:"-"`
 	Package string         `mapstructure:"package"`
 	Options map[string]any `mapstructure:"option"`
 }
 
-// ClientList is a map of names to client configurations.
-type ClientList map[string]Client
+// PluginList is a map of names to client configurations.
+type PluginList map[string]Plugin
 
 // Rotation is used to define a rotation process.
 type Rotation struct {
@@ -80,7 +80,7 @@ func (ss *SecretSet) Names() []string {
 
 // Config is the programmatic representation of the loaded configuration.
 type Config struct {
-	Clients      ClientList    `mapstructure:"plugins"`
+	Plugins      PluginList    `mapstructure:"plugins"`
 	Rotations    []Rotation    `mapstructure:"rotations"`
 	Disablements []Disablement `mapstructure:"disablements"`
 	SecretSets   []SecretSet   `mapstructure:"secret_sets"`
@@ -94,7 +94,7 @@ type Config struct {
 // Returns an error if there's a problem is detected with the configuration or
 // nil if no problem is found.
 func (c *Config) Prepare() error {
-	for k, c := range c.Clients {
+	for k, c := range c.Plugins {
 		c.Name = k
 	}
 

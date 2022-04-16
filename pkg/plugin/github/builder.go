@@ -16,7 +16,7 @@ import (
 type builder struct{}
 
 // Build constructs and returns a github client.
-func (b *builder) Build(ctx context.Context, c *config.Client) (plugin.Instance, error) {
+func (b *builder) Build(ctx context.Context, c *config.Plugin) (plugin.Instance, error) {
 	token := os.Getenv("GITHUB_TOKEN")
 	ts := oauth2.StaticTokenSource(
 		&oauth2.Token{

@@ -26,7 +26,7 @@ func initRotateCmd() {
 }
 
 func RunRotation(cmd *cobra.Command, args []string) {
-	buildMgr := plugin.NewManager(c.Clients)
+	buildMgr := plugin.NewManager(c.Plugins)
 	for _, r := range c.Rotations {
 		RunRotations(buildMgr, &r)
 	}
