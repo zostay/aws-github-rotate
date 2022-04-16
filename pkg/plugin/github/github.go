@@ -111,7 +111,7 @@ func (c *Client) SaveKeys(
 	keyStr := pubKey.GetKey()
 	decKeyBytes, err := base64.StdEncoding.DecodeString(keyStr)
 	if err != nil {
-		return fmt.Errorf("failed to decode github project public key string for project %q: %w", store.Name, err)
+		return fmt.Errorf("failed to decode github project public key string for project %q: %w", store.Name(), err)
 	}
 	keyStr = string(decKeyBytes)
 

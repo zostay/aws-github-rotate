@@ -80,7 +80,7 @@ func (ss *SecretSet) Names() []string {
 type Config struct {
 	Clients      ClientList    `mapstructure:"plugins"`
 	Rotations    []Rotation    `mapstructure:"rotations"`
-	Disablements []Disablement `mapstructure:disablements"`
+	Disablements []Disablement `mapstructure:"disablements"`
 	SecretSets   []SecretSet   `mapstructure:"secret_sets"`
 }
 

@@ -76,11 +76,7 @@ func (m *Manager) disableSecret(ctx context.Context, s *config.Secret) error {
 
 	err := m.client.DisableSecret(ctx, s)
 	if err != nil {
-		return fmt.Errorf(
-			"failed to disable old active secret",
-			"secret", s.SecretName,
-			"client", m.client.Name(),
-		)
+		return fmt.Errorf("failed to disable old active secret %q for disabler %q", s.SecretName, m.client.Name())
 	}
 	return nil
 }

@@ -57,12 +57,19 @@ func init() {
 		"more verbose logging",
 	)
 
-	viper.BindPFlag(
+	err := viper.BindPFlag(
 		"rotateAfter", rootCmd.PersistentFlags().Lookup("rotate-after"),
 	)
-	viper.BindPFlag(
+	if err != nil {
+		panic(err)
+	}
+
+	err = viper.BindPFlag(
 		"disableAfter", rootCmd.PersistentFlags().Lookup("disable-after"),
 	)
+	if err != nil {
+		panic(err)
+	}
 
 	viper.SetDefault("rotateAfter", 168*time.Hour)
 	viper.SetDefault("disableAfter", 48*time.Hour)

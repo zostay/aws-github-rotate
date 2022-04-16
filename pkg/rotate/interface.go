@@ -20,4 +20,3 @@ type Client interface {
 	LastRotated(context.Context, secret.Info) (time.Time, error)
 	RotateSecret(context.Context, secret.Info) (secret.Map, error)
 }
-
