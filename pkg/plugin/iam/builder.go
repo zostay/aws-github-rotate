@@ -15,13 +15,14 @@ import (
 type builder struct{}
 
 // Build constructs and returns an IAM client.
-func (b *builder) Build(ctx context.Context, c *config.Client) (plugin.Instance, error) {
+func (b *builder) Build(ctx context.Context, c *config.Plugin) (plugin.Instance, error) {
 	session := session.Must(session.NewSession())
 	svcIam := iam.New(session)
 
 	return &Client{svcIam}, nil
 }
 
+// init registers the plugin.
 func init() {
 	pkg := reflect.TypeOf(Client{}).PkgPath()
 	plugin.Register(pkg, new(builder))

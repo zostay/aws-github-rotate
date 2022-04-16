@@ -20,7 +20,7 @@ type Manager struct {
 	secrets []config.Secret
 }
 
-// New con      structs a new object to perform password disablement.
+// New constructs a new object to perform password disablement.
 func New(
 	rc Client,
 	disableAfter time.Duration,

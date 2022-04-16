@@ -28,6 +28,7 @@ func (b *builder) Build(ctx context.Context, c *config.Plugin) (plugin.Instance,
 	return &Client{gc}, nil
 }
 
+// init registers the plugin.
 func init() {
 	pkg := reflect.TypeOf(Client{}).PkgPath()
 	plugin.Register(pkg, new(builder))
