@@ -1,5 +1,3 @@
-// Package plugin provides a plugin registry for client plugins that perform
-// rotation and storage functions.
 package plugin
 
 import (
@@ -26,6 +24,7 @@ type Builder interface {
 	Build(ctx context.Context, c *config.Plugin) (Instance, error)
 }
 
+// registy is where all the Builders are held after registered.
 var registry = make(map[string]Builder)
 
 // Register should be called during package initialization to add a plugin
