@@ -6,8 +6,8 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/iam"
-	"github.com/zostay/aws-github-rotate/pkg/config"
-	"github.com/zostay/aws-github-rotate/pkg/plugin"
+	"github.com/zostay/garotate/pkg/config"
+	"github.com/zostay/garotate/pkg/plugin"
 )
 
 // builder implements the plugin.Builder interface and provides a factory method

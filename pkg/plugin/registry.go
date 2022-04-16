@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/zostay/aws-github-rotate/pkg/config"
+	"github.com/zostay/garotate/pkg/config"
 )
 
 // Instance is the interface that all constructed plugins must implement.

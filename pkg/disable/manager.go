@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/zostay/aws-github-rotate/pkg/config"
+	"github.com/zostay/garotate/pkg/config"
 )
 
 // Manager provides the business logic for detecting whether a secret is old

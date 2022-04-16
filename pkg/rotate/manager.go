@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/zostay/aws-github-rotate/pkg/config"
-	"github.com/zostay/aws-github-rotate/pkg/plugin"
-	"github.com/zostay/aws-github-rotate/pkg/secret"
+	"github.com/zostay/garotate/pkg/config"
+	"github.com/zostay/garotate/pkg/plugin"
+	"github.com/zostay/garotate/pkg/secret"
 )
 
 // Manager provides the business logic for detecting whether secrets in the

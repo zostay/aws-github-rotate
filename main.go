@@ -2,9 +2,9 @@
 package main
 
 import (
-	"github.com/zostay/aws-github-rotate/cmd"
-	_ "github.com/zostay/aws-github-rotate/pkg/plugin/github"
-	_ "github.com/zostay/aws-github-rotate/pkg/plugin/iam"
+	"github.com/zostay/garotate/cmd"
+	_ "github.com/zostay/garotate/pkg/plugin/github"
+	_ "github.com/zostay/garotate/pkg/plugin/iam"
 )
 
 // main executes the command.

@@ -9,8 +9,8 @@ import (
 
 	"github.com/google/go-github/v42/github"
 	"github.com/jamesruan/sodium"
-	"github.com/zostay/aws-github-rotate/pkg/config"
-	"github.com/zostay/aws-github-rotate/pkg/secret"
+	"github.com/zostay/garotate/pkg/config"
+	"github.com/zostay/garotate/pkg/secret"
 )
 
 // secretUpdateAt is the container for last updated date's cache keys.

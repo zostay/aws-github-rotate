@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/zostay/aws-github-rotate/pkg/secret"
+	"github.com/zostay/garotate/pkg/secret"
 )
 
 // Storage is the client interface implemented by storage client plugins. A

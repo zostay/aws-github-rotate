@@ -7,8 +7,8 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/iam"
-	"github.com/zostay/aws-github-rotate/pkg/config"
-	"github.com/zostay/aws-github-rotate/pkg/secret"
+	"github.com/zostay/garotate/pkg/config"
+	"github.com/zostay/garotate/pkg/secret"
 )
 
 const (

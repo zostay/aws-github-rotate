@@ -6,8 +6,8 @@ import (
 	"reflect"
 
 	"github.com/google/go-github/v42/github"
-	"github.com/zostay/aws-github-rotate/pkg/config"
-	"github.com/zostay/aws-github-rotate/pkg/plugin"
+	"github.com/zostay/garotate/pkg/config"
+	"github.com/zostay/garotate/pkg/plugin"
 	"golang.org/x/oauth2"
 )
 

@@ -4,7 +4,7 @@ package cmd
 import (
 	"fmt"
 
-	"github.com/zostay/aws-github-rotate/pkg/config"
+	"github.com/zostay/garotate/pkg/config"
 )
 
 // TODO Maybe findSecretSet belongs in config?

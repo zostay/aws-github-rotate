@@ -2,9 +2,9 @@ package cmd
 
 import (
 	"github.com/spf13/cobra"
-	"github.com/zostay/aws-github-rotate/pkg/config"
-	"github.com/zostay/aws-github-rotate/pkg/disable"
-	"github.com/zostay/aws-github-rotate/pkg/plugin"
+	"github.com/zostay/garotate/pkg/config"
+	"github.com/zostay/garotate/pkg/disable"
+	"github.com/zostay/garotate/pkg/plugin"
 )
 
 var (

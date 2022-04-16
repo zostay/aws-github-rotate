@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/zostay/aws-github-rotate/pkg/config"
+	"github.com/zostay/garotate/pkg/config"
 )
 
 // Manager provides a mechanism for building plugis lazily and caching them.

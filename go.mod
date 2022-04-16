@@ -1,4 +1,4 @@
-module github.com/zostay/aws-github-rotate
+module github.com/zostay/garotate
 
 go 1.18
 

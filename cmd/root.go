@@ -6,7 +6,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"github.com/zostay/aws-github-rotate/pkg/config"
+	"github.com/zostay/garotate/pkg/config"
 	"go.uber.org/zap"
 )
 
@@ -25,7 +25,7 @@ func init() {
 	cobra.OnInitialize(initContext, initConfig)
 
 	rootCmd = &cobra.Command{
-		Use:   "aws-github-rotate",
+		Use:   "garotate",
 		Short: "tools for managing AWS secrets on github",
 	}
 
@@ -38,7 +38,7 @@ func init() {
 	)
 	rootCmd.PersistentFlags().StringVar(
 		&cfgFile, "config-file", "",
-		"config file (default is /aws-github-rotate.yaml)",
+		"config file (default is /garotate.yaml)",
 	)
 	rootCmd.PersistentFlags().Duration(
 		"rotate-after", 168*time.Hour,
@@ -100,7 +100,7 @@ func initConfig() {
 	} else {
 		viper.AddConfigPath("/")
 		viper.SetConfigType("yaml")
-		viper.SetConfigName("aws-github-rotate")
+		viper.SetConfigName("garotate")
 	}
 
 	viper.AutomaticEnv()

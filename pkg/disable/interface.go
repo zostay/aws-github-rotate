@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/zostay/aws-github-rotate/pkg/secret"
+	"github.com/zostay/garotate/pkg/secret"
 )
 
 // Client defines the interface that any plugin that wishes to perform
@@ -21,7 +21,7 @@ type Client interface {
 	// or other piece of data.
 	//
 	// The context provides a logger via the
-	// github.com/zostay/aws-github-rotate/pkg/config package. It may also be
+	// github.com/zostay/garotate/pkg/config package. It may also be
 	// used for timeouts.
 	//
 	// The secret.Info describes the secret that is being checked for
@@ -32,7 +32,7 @@ type Client interface {
 	// with the account.
 	//
 	// The context provides a logger via the
-	// github.com/zostay/aws-github-rotate/pkg/config package. It may also be
+	// github.com/zostay/garotate/pkg/config package. It may also be
 	// used for timeouts.
 	//
 	// The secret.Info describes the secret that is being checked for

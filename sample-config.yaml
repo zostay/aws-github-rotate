@@ -1,9 +1,9 @@
 ---
 plugins:
   github:
-    package: github.com/zostay/aws-github-rotate/pkg/plugin/github
+    package: github.com/zostay/garotate/pkg/plugin/github
   IAM:
-    package: github.com/zostay/aws-github-rotate/pkg/plugin/iam
+    package: github.com/zostay/garotate/pkg/plugin/iam
 
 rotations:
   - client: IAM
