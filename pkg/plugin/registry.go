@@ -31,6 +31,9 @@ var registry = make(map[string]Builder)
 // package to the registered list of plugins. The Go package name is preferred
 // as the registered alias by convention, but it could be anything.
 func Register(pkg string, b Builder) {
+	if _, alreadyExists := registry[pkg]; alreadyExists {
+		panic(fmt.Sprintf("garotate plugin %q has already been registered", pkg))
+	}
 	registry[pkg] = b
 }
 
