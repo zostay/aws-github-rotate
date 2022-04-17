@@ -9,7 +9,8 @@ anaylyze:
 clean:
 	rm -rf cover.out
 
-.PHONY: coverage
+.PHONY: coverage cover
+cover: coverage
 coverage:
 	go test -cover -coverprofile cover.out ./... 
 
