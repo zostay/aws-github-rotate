@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/zostay/garotate/pkg/config"
+	"github.com/zostay/garotate/pkg/errors"
 	"github.com/zostay/garotate/pkg/plugin"
 	"github.com/zostay/garotate/pkg/secret"
 )
@@ -217,6 +218,7 @@ func (m *Manager) rotateSecret(
 		)
 	}
 
+	errlist := make([]error, 0)
 	for i := range s.Storages {
 		sm := &s.Storages[i]
 		store, err := m.findStorage(ctx, sm.StorageClient)
@@ -228,6 +230,7 @@ func (m *Manager) rotateSecret(
 		if !m.dryRun {
 			err = store.SaveKeys(ctx, sm, remappedSecret)
 			if err != nil {
+				errlist = append(errlist, err)
 				logger.Errorw(
 					"failed to update storage with newly rotated secrets",
 					"secret", s.Name(),
@@ -244,7 +247,10 @@ func (m *Manager) rotateSecret(
 				"store", store.Name(),
 			)
 		}
+	}
 
+	if len(errlist) > 0 {
+		return errors.NewAggregate(errlist)
 	}
 
 	return nil
@@ -259,6 +265,7 @@ func (m *Manager) rotateSecret(
 // each rotation are updated.
 func (m *Manager) RotateSecrets(ctx context.Context) error {
 	logger := config.LoggerFrom(ctx).Sugar()
+	errlist := make([]error, 0)
 	for i := range m.secrets {
 		s := &m.secrets[i]
 		logger.Debugw(
@@ -269,8 +276,20 @@ func (m *Manager) RotateSecrets(ctx context.Context) error {
 
 		err := m.rotateSecret(ctx, s)
 		if err != nil {
-			return fmt.Errorf("failed to rotate secret: %w", err)
+			errlist = append(errlist,
+				fmt.Errorf("failed to rotate secret: %w", err),
+			)
+			logger.Errorw(
+				"failed to update storage with newly rotated secrets",
+				"secret", s.Name(),
+				"client", m.client.Name(),
+				"error", err,
+			)
 		}
+	}
+
+	if len(errlist) > 0 {
+		return errors.NewAggregate(errlist)
 	}
 
 	return nil

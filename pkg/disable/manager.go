@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/zostay/garotate/pkg/config"
+	"github.com/zostay/garotate/pkg/errors"
 )
 
 // Manager provides the business logic for detecting whether a secret is old
@@ -94,6 +95,7 @@ func (m *Manager) disableSecret(ctx context.Context, s *config.Secret) error {
 // non-active keys that have surpassed the maxActiveAge.
 func (m *Manager) DisableSecrets(ctx context.Context) error {
 	logger := config.LoggerFrom(ctx).Sugar()
+	errlist := make([]error, 0)
 	for k := range m.secrets {
 		s := &m.secrets[k]
 		logger.Debugw(
@@ -104,6 +106,7 @@ func (m *Manager) DisableSecrets(ctx context.Context) error {
 
 		err := m.disableSecret(ctx, s)
 		if err != nil {
+			errlist = append(errlist, err)
 			logger.Errorw(
 				"failed to disable secret",
 				"secret", s.SecretName,
@@ -111,6 +114,10 @@ func (m *Manager) DisableSecrets(ctx context.Context) error {
 			)
 			continue
 		}
+	}
+
+	if len(errlist) > 0 {
+		return errors.NewAggregate(errlist)
 	}
 
 	return nil

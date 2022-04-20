@@ -116,6 +116,30 @@ func TestSadManagerDryRun(t *testing.T) {
 
 func TestHappyManager(t *testing.T) {
 	c := NewTestClient()
+	m := New(c, 0, false,
+		[]config.Secret{
+			{SecretName: "Philip"},
+			{SecretName: "Bartholomew"},
+		},
+	)
+
+	ctx := context.Background()
+	err := m.DisableSecrets(ctx)
+
+	assert.NoError(t, err, "no error on disable secrets happy run")
+
+	callSecrets := []testClientSecret{
+		{call: "LastUpdated", sec: &config.Secret{SecretName: "Philip"}},
+		{call: "DisableSecret", sec: &config.Secret{SecretName: "Philip"}},
+		{call: "LastUpdated", sec: &config.Secret{SecretName: "Bartholomew"}},
+		{call: "DisableSecret", sec: &config.Secret{SecretName: "Bartholomew"}},
+	}
+
+	assert.Equal(t, callSecrets, c.lastCallSecrets, "all four calls made")
+}
+
+func TestSadManager(t *testing.T) {
+	c := NewTestClient()
 	c.failDisableSecret = 0
 	m := New(c, 0, false,
 		[]config.Secret{
@@ -127,7 +151,7 @@ func TestHappyManager(t *testing.T) {
 	ctx := context.Background()
 	err := m.DisableSecrets(ctx)
 
-	assert.NoError(t, err, "no error on disable secrets dry run")
+	assert.Error(t, err, "error on disable secrets sad run")
 
 	callSecrets := []testClientSecret{
 		{call: "LastUpdated", sec: &config.Secret{SecretName: "Philip"}},
@@ -136,5 +160,5 @@ func TestHappyManager(t *testing.T) {
 		{call: "DisableSecret", sec: &config.Secret{SecretName: "Bartholomew"}},
 	}
 
-	assert.Equal(t, callSecrets, c.lastCallSecrets, "only two calls made")
+	assert.Equal(t, callSecrets, c.lastCallSecrets, "all four calls made even when sad")
 }

@@ -23,10 +23,6 @@ var (
 		0, 0, 0, 0,
 		time.UTC,
 	)
-
-	pluginMgr = plugin.NewManager(
-		config.PluginList{},
-	)
 )
 
 type testClientSecret struct {
@@ -76,7 +72,7 @@ func (c *testClient) RotateSecret(
 		sec:  s,
 	})
 	if c.failRotateSecret == 0 {
-		return nil, fmt.Errorf("disable bad stuff")
+		return nil, fmt.Errorf("rotate bad stuff")
 	} else {
 		c.failRotateSecret--
 		return nil, nil
@@ -84,6 +80,9 @@ func (c *testClient) RotateSecret(
 }
 
 func TestHappyManagerDryRun(t *testing.T) {
+	pluginMgr := plugin.NewManager(
+		config.PluginList{},
+	)
 	c := NewTestClient()
 	c.failRotateSecret = 0
 	m := New(c, 0, true,
@@ -97,7 +96,7 @@ func TestHappyManagerDryRun(t *testing.T) {
 	ctx := context.Background()
 	err := m.RotateSecrets(ctx)
 
-	assert.NoError(t, err, "no error on disable secrets dry run")
+	assert.NoError(t, err, "no error on rotate secrets dry run")
 
 	callSecrets := []testClientSecret{
 		{call: "LastRotated", sec: &config.Secret{SecretName: "James"}},
@@ -105,4 +104,88 @@ func TestHappyManagerDryRun(t *testing.T) {
 	}
 
 	assert.Equal(t, callSecrets, c.lastCallSecrets, "only two calls made")
+}
+
+func TestSadManagerDryRun(t *testing.T) {
+	pluginMgr := plugin.NewManager(
+		config.PluginList{},
+	)
+	c := NewTestClient()
+	c.failLastRotated = 0
+	m := New(c, 0, true,
+		pluginMgr,
+		[]config.Secret{
+			{SecretName: "Andrew"},
+			{SecretName: "Peter"},
+		},
+	)
+
+	ctx := context.Background()
+	err := m.RotateSecrets(ctx)
+
+	assert.NoError(t, err, "no error on rotate secretsd dry run even with errors")
+
+	callSecrets := []testClientSecret{
+		{call: "LastRotated", sec: &config.Secret{SecretName: "Andrew"}},
+		{call: "LastRotated", sec: &config.Secret{SecretName: "Peter"}},
+	}
+
+	assert.Equal(t, callSecrets, c.lastCallSecrets, "only two calls made")
+}
+
+func TestHappyManager(t *testing.T) {
+	pluginMgr := plugin.NewManager(
+		config.PluginList{},
+	)
+	c := NewTestClient()
+	m := New(c, 0, false,
+		pluginMgr,
+		[]config.Secret{
+			{SecretName: "Philip"},
+			{SecretName: "Bartholomew"},
+		},
+	)
+
+	ctx := context.Background()
+	err := m.RotateSecrets(ctx)
+
+	assert.NoError(t, err, "no error on rotate secrets happy run")
+
+	callSecrets := []testClientSecret{
+		{call: "LastRotated", sec: &config.Secret{SecretName: "Philip"}},
+		{call: "RotateSecret", sec: &config.Secret{SecretName: "Philip"}},
+		{call: "LastRotated", sec: &config.Secret{SecretName: "Bartholomew"}},
+		{call: "RotateSecret", sec: &config.Secret{SecretName: "Bartholomew"}},
+	}
+
+	assert.Equal(t, callSecrets, c.lastCallSecrets, "all four calls made on happy run")
+}
+
+func TestSadManagerFailToRotate(t *testing.T) {
+	pluginMgr := plugin.NewManager(
+		config.PluginList{},
+	)
+	c := NewTestClient()
+	c.failRotateSecret = 0
+	m := New(c, 0, false,
+		pluginMgr,
+		[]config.Secret{
+			{SecretName: "Philip"},
+			{SecretName: "Bartholomew"},
+		},
+	)
+
+	ctx := context.Background()
+	err := m.RotateSecrets(ctx)
+
+	assert.Error(t, err, "got errors during sad rotation")
+
+	callSecrets := []testClientSecret{
+		{call: "LastRotated", sec: &config.Secret{SecretName: "Philip"}},
+		{call: "RotateSecret", sec: &config.Secret{SecretName: "Philip"}},
+		{call: "LastRotated", sec: &config.Secret{SecretName: "Bartholomew"}},
+		{call: "RotateSecret", sec: &config.Secret{SecretName: "Bartholomew"}},
+	}
+
+	assert.Equal(t, callSecrets, c.lastCallSecrets, "all four calls made even when sad")
 }
