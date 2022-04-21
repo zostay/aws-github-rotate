@@ -65,14 +65,14 @@ disablements:
 secret_sets:
   - name: main
     secrets:
-      - secret: ***REMOVED***
+      - secret: s3sync-builder
         storages:
           - storage: github
             name: zostay/periodic-s3-sync
             keys:
               AWS_ACCESS_KEY_ID: access_key
               AWS_SECRET_ACCESS_KEY: secret_key
-      - secret: ***REMOVED***
+      - secret: postfix-builder
         storages:
           - storage: github
             name: zostay/postfix
