@@ -1,51 +1,78 @@
 ---
+# plugins lists the configurations to use for rotation, disablement, and
+# storage. For now, every configuration must define this section exactly like
+# this. The names "github" and "IAM" could be changed, but nothing else. These
+# two plugins must be configured exactly this way.
 plugins:
   github:
     package: github.com/zostay/garotate/pkg/plugin/github
   IAM:
     package: github.com/zostay/garotate/pkg/plugin/iam
 
+# The rotations section configures rotation policies. Each item in the list has
+# the following keys:
+# 
+# client: This names the plugin to use, which must match the name in the plugins
+#   section.
+# rotate_after: The duration setting that determines how long to wait before
+#   rotating the secret. The first run of the rotation tool after this amount of
+#   time has passed since last rotation will trigger rotation.
+# secret_set: This is the list of secrets that will be rotated according to this
+#   policy.
 rotations:
   - client: IAM
     rotate_after: "168h"
     secret_set: main
 
+# The disablements section configures disablement policies. Each item in the
+# list has the following keys:
+#
+# client: This names the plugin to use, which must match the name in the plugins
+#   section.
+# disable_after: The duration setting that determines how long to wait before
+#   disabling the secret. The first run of the disablement tool after this
+#   amount of time has passed since the secret was created will trigger
+#   disablement. You will want this to be longer than the rotation policy time
+#   unless you want inactive secrets to be disabled immediately after rotation.
+# secret_set: This is the list of secrets that will be rotated according to this
+#   policy.
 disablements:
   - client: IAM
     disable_after: "216h"
     secret_set: main
 
+# The secret_sets section configures the list of secrets that should have a
+# policy applied to them.
+#
+# Each secret item in the list of secrets must have the following keys:
+# 
+# secret: The name of the secret to change, whatever names accounts that can be
+#   rotated in the plugin. For AWS, this is IAM user name.
+# storages: This lists configuration for each of the places that need to be
+#   updated after the secret is rotated.
+#
+# Each storage item in the list of storages must have the following keys:
+#
+# storage: This is the name of the storage plugin to use. This must exactly
+#   match the name of a storage plugin defined in the plugins section.
+# name: This is the name of the service that will be receiving a fresh copy of
+#   the rotated secret following rotation. This is whatever value the plugin
+#   needs. For github, this is the github project name in owner/repo form.
+# keys: This is a map that remaps the keys provided by the rotation plugin to
+#   the keys to use when storing. The AWS plugin provides two keys,
+#   "AWS_ACCESS_KEY_ID" and "AWS_SECRET_ACCESS_KEY". If no keys section is
+#   provided, then the keys used are the keys provided by the rotation plugin.
 secret_sets:
   - name: main
     secrets:
-     - secret: ***REMOVED***
-       storages:
-        - storage: github
-          name: ***REMOVED***
-          keys:
-            AWS_ACCESS_KEY_ID: AWS_ACCESS_KEY_ID
-            AWS_SECRET_ACCESS_KEY: AWS_SECRET_ACCESS_KEY
-     - secret: ***REMOVED***
-       storages:
-        - name: ***REMOVED***
-     - secret: ***REMOVED***
-       storages:
-        - name: ***REMOVED***
-     - secret: ***REMOVED***
-       storages:
-        - name: zostay/periodic-s3-sync
-     - secret: ***REMOVED***
-       storages:
-        - name: zostay/postfix
-     - secret: ***REMOVED***
-       storages:
-        - name: ***REMOVED***
-     - secret: ***REMOVED***
-       storages:
-        - name: ***REMOVED***
-     - secret: ***REMOVED***
-       storages:
-        - name: ***REMOVED***
-   # possible shorthand if only a single storage and secret?
-     - secret: ***REMOVED***
-       name: ***REMOVED***
+      - secret: ***REMOVED***
+        storages:
+          - storage: github
+            name: zostay/periodic-s3-sync
+            keys:
+              AWS_ACCESS_KEY_ID: access_key
+              AWS_SECRET_ACCESS_KEY: secret_key
+      - secret: ***REMOVED***
+        storages:
+          - storage: github
+            name: zostay/postfix
