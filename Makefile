@@ -29,3 +29,6 @@ show-coverage: coverage
 .PHONY: test
 test:
 	go test -race ./...
+
+install:
+	go install ./

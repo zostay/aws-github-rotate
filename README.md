@@ -9,7 +9,21 @@ services unavailable).
 
 # Getting Started
 
-TODO
+Currently, this tool does not provide much in the way of help for deployment.
+You will need to have Golang installed at least. Installing it from Go just
+requires:
+
+```bash
+go install github.com/zostay/garotate@latest
+```
+
+To install from source:
+
+```bash
+git clone git@github.com:zostay/garotate.git
+cd garotate
+make test && make install
+```
 
 # Configuration
 
