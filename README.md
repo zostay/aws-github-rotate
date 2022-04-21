@@ -121,15 +121,25 @@ You must provide AWS configuration using the usual means. This can mean files in
 an `~/.aws` folder as used by the AWS CLI or environment variables to provide
 the required credentials.
 
-TODO Name the specific credentials and the permissions required for the AWS key
-to do its thing here.
+See the [Specifying
+Credentials](https://docs.aws.amazon.com/sdk-for-go/v1/developer-guide/configuring-sdk.html#specifying-credentials)
+section of the Go SDK for full details.
+
+For the IAM plugin to work, these credentials must provide garotate with the
+following permissions:
+
+* iam:ListAccessKeys
+* iam:CreateAccessKey
+* iam:DeleteAccessKey
+* iam:UpdateAccessKey
 
 ## Github Plugin Configuration.
 
 You must provide a `GITHUB_TOKEN` with `repo` permissions for the github plugin
 to work.
 
-TODO Include a linke to instructions on setting up a personal access token here.
+Github provides instructions on [creating a personal access
+token](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/creating-a-personal-access-token).
 
 # Supported Plugins
 
