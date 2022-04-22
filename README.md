@@ -102,14 +102,14 @@ disablements:
 secret_sets:
   - name: main
     secrets:
-      - secret: ***REMOVED***
+      - secret: s3sync-builder
         storages:
           - storage: github
             name: zostay/periodic-s3-sync
             keys:
               AWS_ACCESS_KEY_ID: access_key
               AWS_SECRET_ACCESS_KEY: secret_key
-      - secret: ***REMOVED***
+      - secret: postfix-builder
         storages:
           - storage: github
             name: zostay/postfix
@@ -140,6 +140,18 @@ to work.
 
 Github provides instructions on [creating a personal access
 token](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/creating-a-personal-access-token).
+
+# Running
+
+Once configured, running it is straightforward:
+
+```bash
+garotate --config-file garotate.yaml
+```
+
+Use `-h` to retrieve a list and description of options. There are a few options
+which can be specified on the command-line. The rest of the configuration is
+performed either via environment or configuration file.
 
 # Supported Plugins
 
