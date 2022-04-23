@@ -5,10 +5,6 @@ all: generate fmt test analyze
 anaylyze:
 	golangci-lint run ./...
 
-.PHONY: clean
-clean:
-	rm -rf cover.out
-
 .PHONY: coverage cover
 cover: coverage
 coverage:
@@ -42,3 +38,9 @@ garotate-$(GOOS)-$(GOARCH):
 
 .PHONY: release-packages
 release-packages: garotate-$(GOOS)-$(GOARCH)
+
+.PHONY: clean
+clean:
+	rm -rf cover.out
+	rm -f garotate-$(GOOS)-$(GOARCH)
+
