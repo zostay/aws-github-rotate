@@ -22,7 +22,7 @@ fmt:
 generate:
 	go generate ./...
 
-.PHONE: show-coverage
+.PHONY: show-coverage
 show-coverage: coverage
 	go tool cover -html cover.out
 
@@ -30,5 +30,15 @@ show-coverage: coverage
 test:
 	go test -race ./...
 
+.PHONY: install
 install:
 	go install ./
+
+GOOS ?= $(shell uname -s | tr '[:upper:]' '[:lower:]')
+GOARCH ?= $(shell uname -m)
+
+garotate-$(GOOS)-$(GOARCH):
+	go build -o garotate-$(GOOS)-$(GOARCH) ./
+
+.PHONY: release-packages
+release-packages: garotate-$(GOOS)-$(GOARCH)
