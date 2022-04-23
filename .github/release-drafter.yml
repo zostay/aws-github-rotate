@@ -1,0 +1,20 @@
+name-template: 'v$RESOLVED_VERSION'
+tag-template: 'v$RESOLVED_VERSION'
+version-template: '$MAJOR.$MINOR'
+version-resolver:
+  major:
+    labels:
+    - major
+  minor:
+    labels:
+    - minor
+  default: minor
+template: |
+  ## What's Changed
+
+  $CHANGES
+
+  ## Contributors
+
+  $CONTRIBUTORS
+
