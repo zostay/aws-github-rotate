@@ -1,5 +1,5 @@
-name-template: 'v$NEXT_MINOR_RELEASE'
-tag-template: 'v$NEXT_MINOR_RELEASE'
+name-template: 'v$NEXT_MINOR_VERSION'
+tag-template: 'v$NEXT_MINOR_VERSION'
 template: |
   ## What's Changed
 
