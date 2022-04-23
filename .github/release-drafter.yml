@@ -1,14 +1,5 @@
-name-template: 'v$RESOLVED_VERSION'
-tag-template: 'v$RESOLVED_VERSION'
-version-template: '$MAJOR.$MINOR'
-version-resolver:
-  major:
-    labels:
-    - major
-  minor:
-    labels:
-    - minor
-  default: minor
+name-template: 'v$NEXT_MINOR_RELEASE'
+tag-template: 'v$NEXT_MINOR_RELEASE'
 template: |
   ## What's Changed
 
