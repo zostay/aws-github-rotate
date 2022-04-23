@@ -33,14 +33,14 @@ install:
 GOOS ?= $(shell uname -s | tr '[:upper:]' '[:lower:]')
 GOARCH ?= $(shell uname -m)
 
-garotate-$(GOOS)-$(GOARCH):
-	go build -o garotate-$(GOOS)-$(GOARCH) ./
+dist/garotate-$(GOOS)-$(GOARCH):
+	go build -o dist/garotate-$(GOOS)-$(GOARCH) ./
 
-.PHONY: release-packages
-release-packages: garotate-$(GOOS)-$(GOARCH)
+.PHONY: release-binary
+release-binary: dist/garotate-$(GOOS)-$(GOARCH)
 
 .PHONY: clean
 clean:
 	rm -rf cover.out
-	rm -f garotate-$(GOOS)-$(GOARCH)
+	rm -rf dist/*
 
