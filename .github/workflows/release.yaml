@@ -24,7 +24,6 @@ jobs:
       matrix:
         include:
         - os: ubuntu-latest
-          artifact_name: garotate-linux-x86_64
           asset_name: garotate-linux-x86_64
     steps:
     - run: sudo apt-get update
@@ -34,12 +33,13 @@ jobs:
       with:
         go-version: 1.18
     - run: make release-binary
-    - uses: svenstaro/upload-release-action@v2
+    - uses: release-drafter/release-drafter@v5
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    - uses: shogo82148/actions-upload-release-asset@v1
       with:
-        repo_token: ${{ secrets.GITHUB_TOKEN }}
-        tag: ${{ github.ref }}
-        file: dist/${{ matrix.artifact_name }}
-        asset_name: ${{ matrix.asset_name }}
+        upload_url: ${{ steps.release_drafter.outputs.upload_url }}
+        asset_path: dirst/${{ matrix.asset_name }}
 
   docker:
     needs: [ release-test ]
