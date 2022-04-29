@@ -24,8 +24,8 @@ jobs:
       matrix:
         include:
         - os: ubuntu-latest
-          artifact_name: garotate-linux-amd64
-          asset_name: garotate-linux-amd64
+          artifact_name: garotate-linux-x86_64
+          asset_name: garotate-linux-x86_64
     steps:
     - run: sudo apt-get update
     - run: sudo apt-get install --yes libsodium-dev
@@ -40,7 +40,7 @@ jobs:
         tag: ${{ github.ref }}
         file: dist/${{ matrix.artifact_name }}
         asset_name: ${{ matrix.asset_name }}
-    
+
   docker:
     needs: [ release-test ]
     runs-on: ubuntu-latest
