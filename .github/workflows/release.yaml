@@ -19,6 +19,7 @@ jobs:
 
   publish-garotate-binaries:
 		needs: [ release-test ]
+		runs-on: ${{ matrix.os }}
 		strategy:
 			matrix:
 				include:
