@@ -27,6 +27,8 @@ jobs:
           artifact_name: garotate-linux-amd64
           asset_name: garotate-linux-amd64
     steps:
+    - run: sudo apt-get update
+    - run: sudo apt-get install --yes libsodium-dev
     - uses: actions/checkout@v2
     - uses: actions/setup-go@v2
       with:
