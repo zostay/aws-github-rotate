@@ -2,13 +2,15 @@ package github
 
 import (
 	"context"
+	"crypto/rand"
 	"encoding/base64"
 	"fmt"
+	"io"
 	"strings"
 	"time"
 
+	"golang.org/x/crypto/nacl/secretbox"
 	"github.com/google/go-github/v42/github"
-	"github.com/jamesruan/sodium"
 	"github.com/zostay/garotate/pkg/config"
 	"github.com/zostay/garotate/pkg/secret"
 )
@@ -117,18 +119,16 @@ func (c *Client) SaveKeys(
 
 	keyIDStr := pubKey.GetKeyID()
 
-	pkBox := sodium.BoxPublicKey{
-		Bytes: sodium.Bytes([]byte(keyStr)),
-	}
-
 	logger := config.LoggerFrom(ctx).Sugar()
 	for key, sec := range ss {
-		keyBox := sodium.Bytes([]byte(sec))
-		keySealed := keyBox.SealedBox(pkBox)
-		keyEncSealed := base64.StdEncoding.EncodeToString(keySealed)
+		keyEncSealed, err := sealedBox(keyStr, sec)
+		if err != nil {
+			return err
+		}
 
-		logger.Debugw(
+		logger.Infow(
 			"updating github action secret",
+			"client", c.Name(),
 			"storage", store.Name(),
 			"secret", key,
 		)
@@ -147,4 +147,21 @@ func (c *Client) SaveKeys(
 	}
 
 	return nil
+}
+
+// sealedBox handles sealing the secret for sending and encoding it as Base64.
+func sealedBox(pk, secret string) (string, error) {
+	var pkBytes [32]byte
+	copy(pkBytes[:], []byte(secret))
+	secretBytes := []byte(secret)
+
+	var nonce [24]byte
+	if _, err := io.ReadFull(rand.Reader, nonce[:]); err != nil {
+		return "", fmt.Errorf("failed to generate nonce: %w", err)
+	}
+
+	enc := secretbox.Seal(nonce[:], secretBytes, &nonce, &pkBytes)
+	encEnc := base64.StdEncoding.EncodeToString(enc)
+
+	return encEnc, nil
 }
