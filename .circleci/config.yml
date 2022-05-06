@@ -5,8 +5,8 @@ orbs:
 
 executors:
   linux:
-    machine:
-      image: ubuntu-2004:202201-02
+    docker:
+      - image: golang:1.18
 
   macos:
     macos:
@@ -14,21 +14,13 @@ executors:
 
 jobs:
   build-binary:
-    parameters:
-      resource:
-        description: resource class to use
-        type: string
-        default: medium
-
     executor: linux
-    resource_class: << parameters.resource >>
     steps:
     - checkout
-    - go/install:
-        version: "1.18"
-    - run: sudo apt-get update
-    - run: sudo apt-get install --yes libsodium-dev
-    - run: make release-binary
+    - run: apt-get update
+    - run: apt-get install --yes awscli
+    - run: make upload-release-binary TARGET_ARCH=amd64
+    - run: make upload-release-binary TARGET_ARCH=arm64
 
   build-universal-binary:
     executor: macos
@@ -36,8 +28,8 @@ jobs:
     - checkout
     - go/install:
         version: "1.18"
-    - run: brew install pkg-config
-    - run: make dist/garotate-darwin-universal
+    - run: brew install awscli || true
+    - run: make upload-release-binary-universal
 
 workflows:
   all-binaries:
@@ -45,9 +37,5 @@ workflows:
       equal: [ << pipeline.git.branch >>, 'circleci' ]
 
     jobs:
-    - build-binary:
-        matrix:
-          parameters:
-            resource: [ medium, medium.arm64 ]
-
+    - build-binary
     - build-universal-binary

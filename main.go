@@ -3,6 +3,7 @@ package main
 
 import (
 	"github.com/zostay/garotate/cmd"
+	_ "github.com/zostay/garotate/pkg/plugin/circleci"
 	_ "github.com/zostay/garotate/pkg/plugin/github"
 	_ "github.com/zostay/garotate/pkg/plugin/iam"
 )

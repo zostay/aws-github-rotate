@@ -32,6 +32,8 @@ install:
 
 HOST_OS = $(shell uname -s | tr '[:upper:]' '[:lower:]')
 HOST_ARCH = $(shell uname -m)
+
+TARGET_OS ?= $(HOST_OS)
 TARGET_ARCH ?= $(HOST_ARCH)
 
 ifeq ($(HOST_ARCH), x86_64)
@@ -41,11 +43,11 @@ ifeq ($(TARGET_ARCH), x86_64)
 	TARGET_ARCH = amd64
 endif
 
-GOOS ?= $(HOST_OS)
+GOOS ?= $(TARGET_OS)
 GOARCH ?= $(TARGET_ARCH)
 
 dist/garotate-$(GOOS)-$(GOARCH):
-	GOOS=$(GOOS) GOARCH=$(GOARCH) go build -o dist/garotate-$(GOOS)-$(GOARCH) ./
+	GOOS=$(GOOS) GOARCH=$(GOARCH) go build -o $@ ./
 
 dist/garotate-darwin-universal-arm64: 
 	make dist/garotate-darwin-arm64 GOOS=darwin GOARCH=arm64
@@ -60,6 +62,8 @@ dist/garotate-darwin-universal: dist/garotate-darwin-universal-amd64 dist/garota
 
 .PHONY: release-binary
 release-binary: dist/garotate-$(GOOS)-$(GOARCH)
+
+S3URL = s3://garotate.qubling.cloud/releases
 
 .PHONY: upload-release-binary upload-release-binary-universal
 upload-release-binary: release-binary
