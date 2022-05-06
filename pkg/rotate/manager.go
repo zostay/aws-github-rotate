@@ -2,6 +2,7 @@ package rotate
 
 import (
 	"context"
+	goerr "errors"
 	"fmt"
 	"time"
 
@@ -120,9 +121,19 @@ func (m *Manager) needsRotation(
 			return false
 		}
 
-		for _, storeKey := range sm.Keys {
+		storeKeys := remapKeys(
+			sm.Keys,
+			m.client.Keys(),
+		)
+
+		for _, storeKey := range storeKeys {
 			saved, err := store.LastSaved(ctx, sm, storeKey)
 			if err != nil {
+				// key not found? we need it, so let's rotate
+				if goerr.Is(err, secret.ErrKeyNotFound) {
+					return true
+				}
+
 				logger.Errorw(
 					"got error while checking last storage date; for safety, rotation will be prevented",
 					"secret", s.Name(),

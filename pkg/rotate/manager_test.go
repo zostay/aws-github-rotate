@@ -50,6 +50,13 @@ func (c *testClient) Name() string {
 	return "test"
 }
 
+func (c *testClient) Keys() secret.Map {
+	return secret.Map{
+		"alpha": "",
+		"beta":  "",
+	}
+}
+
 func (c *testClient) LastRotated(ctx context.Context, s secret.Info) (time.Time, error) {
 	c.lastCallSecrets = append(c.lastCallSecrets, testClientSecret{
 		call: "LastRotated",

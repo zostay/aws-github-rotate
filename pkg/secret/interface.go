@@ -16,6 +16,12 @@
 // secret.
 package secret
 
+import "errors"
+
+// ErrKeyNotFound is returned by storage plugins when an operation requires a
+// storage key, but that storage key does not exist.
+var ErrKeyNotFound = errors.New("key not found in storage")
+
 // Cache each secret context has an associated cache, which allows the plugin
 // client to store any information that is expensive to caculate with the secret
 // context.

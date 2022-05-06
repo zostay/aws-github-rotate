@@ -54,6 +54,14 @@ func (c *Client) Name() string {
 	return "AWS IAM"
 }
 
+// Keys returns AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY.
+func (c *Client) Keys() secret.Map {
+	return secret.Map{
+		AccessKeyName: "",
+		SecretKeyName: "",
+	}
+}
+
 // LastRotated will return the data of the newest key on the IAM account.
 func (c *Client) LastRotated(
 	ctx context.Context,
@@ -62,6 +70,9 @@ func (c *Client) LastRotated(
 	_, newKey, err := c.getAccessKeys(ctx, sec)
 	if err != nil {
 		return time.Time{}, err
+	}
+	if newKey == nil {
+		return time.Time{}, nil
 	}
 
 	return aws.TimeValue(newKey.CreateDate), nil
