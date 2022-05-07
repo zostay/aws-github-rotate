@@ -43,10 +43,15 @@ ifeq ($(TARGET_ARCH), x86_64)
 	TARGET_ARCH = amd64
 endif
 
+BINARY_EXT =
+ifeq ($(TARGET_OS), windows)
+	BINARY_EXT = .exe
+endif
+
 GOOS ?= $(TARGET_OS)
 GOARCH ?= $(TARGET_ARCH)
 
-dist/garotate-$(GOOS)-$(GOARCH):
+dist/garotate-$(GOOS)-$(GOARCH)$(BINARY_EXT):
 	GOOS=$(GOOS) GOARCH=$(GOARCH) go build -o $@ ./
 
 dist/garotate-darwin-universal-arm64: 
@@ -61,13 +66,13 @@ dist/garotate-darwin-universal: dist/garotate-darwin-universal-amd64 dist/garota
 	lipo -create -output dist/garotate-darwin-universal $<
 
 .PHONY: release-binary
-release-binary: dist/garotate-$(GOOS)-$(GOARCH)
+release-binary: dist/garotate-$(GOOS)-$(GOARCH)$(BINARY_EXT)
 
 S3URL = s3://garotate.qubling.cloud/releases
 
 .PHONY: upload-release-binary upload-release-binary-universal
 upload-release-binary: release-binary
-	aws s3 cp dist/garotate-$(GOOS)-$(GOARCH) $(S3URL)/garotate-$(GOOS)-$(GOARCH)
+	aws s3 cp dist/garotate-$(GOOS)-$(GOARCH)$(BINARY_EXT) $(S3URL)/garotate-$(GOOS)-$(GOARCH)$(BINARY_EXT)
 
 upload-release-binary-universal: dist/garotate-darwin-universal
 	aws s3 cp dist/garotate-darwin-amd64 $(S3URL)/garotate-darwin-amd64

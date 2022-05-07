@@ -21,6 +21,9 @@ jobs:
     - run: apt-get install --yes awscli
     - run: make upload-release-binary TARGET_ARCH=amd64
     - run: make upload-release-binary TARGET_ARCH=arm64
+    - run: make upload-release-binary TARGET_OS=windows TARGET_ARCH=amd64
+    - run: make upload-release-binary TARGET_OS=windows TARGET_ARCH=arm64
+    - run: make upload-release-binary TARGET_OS=windows TARGET_ARCH=386
 
   build-universal-binary:
     executor: macos
