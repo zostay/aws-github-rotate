@@ -9,10 +9,10 @@ import (
 	"strings"
 	"time"
 
-	"golang.org/x/crypto/nacl/secretbox"
 	"github.com/google/go-github/v42/github"
 	"github.com/zostay/garotate/pkg/config"
 	"github.com/zostay/garotate/pkg/secret"
+	"golang.org/x/crypto/nacl/secretbox"
 )
 
 // secretUpdateAt is the container for last updated date's cache keys.
