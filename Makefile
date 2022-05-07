@@ -79,6 +79,18 @@ upload-release-binary-universal: dist/garotate-darwin-universal
 	aws s3 cp dist/garotate-darwin-arm64 $(S3URL)/garotate-darwin-arm64
 	aws s3 cp dist/garotate-darwin-universal $(S3URL)/garotate-darwin-universal
 
+.PHONY: finalize-release
+finalize-release:
+	./scripts/mkrelease $(VERSION) $(S3URL) \
+		garotate-darwin-amd64 \
+		garotate-darwin-arm64 \
+		garotate-darwin-universal \
+		garotate-linux-amd64 \
+		garotate-linux-arm64 \
+		garotate-windows-386.exe \
+		garotate-windows-amd64.exe \
+		garotate-windows-arm64.exe
+
 .PHONY: clean
 clean:
 	rm -rf cover.out

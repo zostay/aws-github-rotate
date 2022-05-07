@@ -1,0 +1,224 @@
+#!/usr/bin/env perl
+
+use v5.30;
+use warnings;
+
+use Carp qw( confess );
+use Getopt::Long;
+
+my $changelog = "CHANGELOG.md";
+my $dist_dir = "dist";
+
+sub usage {
+    print STDERR <<~USAGE;
+usage: $0 <version> <s3url> <assets>...
+
+  <version> must be in the form of:
+
+  v#.#-<word>#
+
+  where <word> may be one of "alpha", "beta", and "rc". Everything following the
+  hyphen ("-"), including the hyphen, is optional.
+USAGE
+  exit 1;
+}
+
+sub slurp_top_entry {
+    my ($file) = @_;
+
+    open my $fh, '<', $file
+        or progress_quit("cannot read $file: $!");
+
+    my $notes = '';
+    my $remainder = '';
+    my $s = 'start';
+    while (<$fh>) {
+        $s eq 'start' && do {
+            next if /^# /;
+            next if /^\s*$/;
+            $s = 'notes';
+            next;
+        };
+        $s eq 'notes' && do {
+            if (/^## /) {
+                $s = 'remainder';
+                $remainder .= $_;
+                next;
+            }
+            $notes .= $_;
+            next;
+        };
+
+        $remainder .= $_;
+    }
+
+    close $file;
+
+    return ($notes, $remainder);
+}
+
+sub finalize_changelog {
+    my ($opt) = @_;
+    my $date = localtime;
+
+    open my $fh, '>', $opt->{changelog}
+        or progress_quit("cannot write $opt->{changelog}: $!");
+
+    print $fh "# Changelog\n\n";
+    print $fh "## $opt->{version} $date\n\n";
+    print $fh $opt->{notes};
+    print $fh $opt->{footer};
+
+    close $fh;
+}
+
+sub capture_run {
+    my ($cmd, $callback) = @_;
+
+    open my $rh, '-|', @$cmd
+        or progress_quit("cannot run '@$cmd': $!");
+
+    while (<$rh>) {
+        $callback->($_);
+    }
+
+    close $rh
+        or progress_quit("cannot complete '@$cmd': $!");
+}
+
+sub slurp_run {
+    my $content = '';
+    capture_run(
+        \@_,
+        sub { $content .= $_ },
+    );
+    return $content;
+}
+
+sub run {
+    capture_run(\@_, sub {});
+}
+
+sub verify_tag {
+    my ($version) = @_;
+
+    my $vout = slurp_run('git', 'tag', '-l', $version);
+    $vout =~ s/^\s+//; $vout =~ s/\s+$//;
+
+    die "Tag named $version is already in use.\n"
+        if $vout eq $version;
+}
+
+sub progress_item {
+    print @_;
+}
+
+sub progress_bullet {
+    say " - ", @_;
+}
+
+sub progress_status {
+    say @_;
+}
+
+sub progress_quit {
+    say "FAILED";
+    confess @_;
+}
+
+sub release_notes {
+    my ($version, $notes) = @_;
+
+    open my $rh, '>', "$dist_dir/$version.md"
+        or progress_quit("cannot write to $dist_dir/$version.md: $!");
+
+    my $now = localtime;
+
+    print $rh "## Release Notes\n\n";
+    print $rh "The following changes have been made this release:\n\n";
+    print $rh $notes;
+
+    close $rh;
+
+    return "$dist_dir/$version.md";
+}
+
+sub MAIN {
+    my ($version, $s3url, @assets) = @_;
+
+    usage() unless defined $version && $version =~ /^
+        v\d+                      # major
+        \.
+        \d+                       # minor
+        (?:-(?:alpha|beta|rc)\d+) # keyword
+    $/x;
+
+    # Sanity check
+    progress_item("Checking for tag $version ... ");
+    verify_tag($version);
+    progress_status("OK");
+
+    # Finish the change log
+    progress_item("Finalizing changelog ... ");
+    my ($notes, $footer) = slurp_top_entry($changelog);
+    finalize_changelog({
+        changelog => $changelog,
+        notes     => $notes,
+        footer    => $footer,
+        version   => $version,
+    });
+
+    # Add updated changelog to the repo
+    run('git', 'add', $changelog);
+    run('git', 'commit', '-m', 'changelog');
+    progress_status("OK");
+
+    # Genereate release notes
+    progress_item("Finalizing notes file ... ");
+    my $notes_file = release_notes($version, $notes);
+    progress_item($notes_file);
+    progress_status("OK");
+
+    # Setup release tag
+    progress_item("Tagging $version ... ");
+    run('git', 'tag', $version);
+    progress_status("OK");
+
+    # Push changes to github
+    progress_item("Publishing changes ... ");
+    run('git', 'push', 'origin', 'master');
+    run('git', 'push', 'origin', $version);
+    progress_status("OK");
+
+    # Draft the release
+    progress_item("Drafting a $version release ... ");
+    my @extras;
+    if ($version =~ /-\w+/) {
+        @extras = qw( --prerelease );
+    }
+    run(
+        'gh', 'release', 'create', $version, '-d', '-F', $notes_file, '-t', $version,
+        @extras,
+    );
+    progress_status("OK");
+
+    # Pull assets from S3
+    for my $asset (@assets) {
+        progress_item("Pulling $asset from $s3url ... ");
+        run(
+            'aws', 's3', 'cp', "$s3url/$asset", "$dist_dir/$asset",
+        );
+        progress_status("OK");
+    }
+
+    # Add assets
+    for my $asset (@assets) {
+        progress_item("Releasing $asset ... ");
+        run(
+            'gh', 'release', 'upload', $version, "$dist_dir/$asset", '--clobber',
+        );
+        progress_status("OK");
+    }
+}
+
+MAIN(@ARGV)
