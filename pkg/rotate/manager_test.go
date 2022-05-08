@@ -208,8 +208,9 @@ func TestSadManagerFailToRotate(t *testing.T) {
 }
 
 type testStorage struct {
-	storage   map[string]map[string]string
-	lastSaved time.Time
+	storage       map[string]map[string]string
+	lastSaved     time.Time
+	failLastSaved int
 }
 
 func (t *testStorage) Name() string {
@@ -233,6 +234,12 @@ func (t *testStorage) LastSaved(
 	store secret.Storage,
 	key string,
 ) (time.Time, error) {
+	if t.failLastSaved == 0 {
+		return time.Time{}, fmt.Errorf("last saved bad stuff")
+	} else {
+		t.failLastSaved--
+	}
+
 	ts := t.testStorage(store)
 	if _, found := ts[key]; !found {
 		return time.Time{}, secret.ErrKeyNotFound
@@ -260,8 +267,17 @@ func (b *testStorageBuilder) Build(
 	ctx context.Context,
 	c *config.Plugin,
 ) (plugin.Instance, error) {
+	failLastSaved := -1
+	if fls, ok := c.Options["failLastSaved"]; ok {
+		flsi, ok := fls.(int)
+		if !ok {
+			panic("test configuration is wrong in the failLastSaved key")
+		}
+		failLastSaved = flsi
+	}
 	return &testStorage{
-		lastSaved: futureDate,
+		lastSaved:     futureDate,
+		failLastSaved: failLastSaved,
 	}, nil
 }
 
@@ -427,6 +443,51 @@ func TestHappyRotationStorageSkipping(t *testing.T) {
 func TestSadRotationMissingStorage(t *testing.T) {
 	pluginMgr := plugin.NewManager(
 		config.PluginList{},
+	)
+
+	c := NewTestClient()
+	c.lastRotated = recentButPastDate
+	m := New(c, 24*time.Hour, false,
+		pluginMgr,
+		[]config.Secret{
+			{
+				SecretName: "Thomas",
+				Storages: []config.StorageMap{
+					{
+						StorageClient: "test",
+						StorageName:   "Thomas",
+						Keys: config.KeyMap{
+							"alpha": "omega",
+						},
+					},
+				},
+			},
+		},
+	)
+
+	// cheating: we trigger the lazy construction here so we can manipulate
+	// the state of the test object. This is highly dependent on how plugin
+	// instance caching works.
+	ctx := context.Background()
+
+	err := m.RotateSecrets(ctx)
+
+	// TODO It would be nice to test for log messages.
+
+	assert.NoError(t, err, "error occurrd, but only logged")
+}
+
+func TestSadRotationBrokenStorage(t *testing.T) {
+	pluginMgr := plugin.NewManager(
+		config.PluginList{
+			"test": config.Plugin{
+				Name:    "test",
+				Package: "testStorage",
+				Options: map[string]any{
+					"failLastSaved": 0,
+				},
+			},
+		},
 	)
 
 	c := NewTestClient()
