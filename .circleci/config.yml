@@ -63,6 +63,8 @@ workflows:
             only: /^release-(\d+\.\d+(-[a-z]+\d+))$/
     - build-universal-binary:
         filters:
+          branches:
+            ignore: /.*/
           tags:
             only: '^release-(\d+\.\d+(-[a-z]+\d+))$'
 
