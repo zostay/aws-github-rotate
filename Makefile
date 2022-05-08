@@ -68,7 +68,9 @@ dist/garotate-darwin-universal: dist/garotate-darwin-universal-amd64 dist/garota
 .PHONY: release-binary
 release-binary: dist/garotate-$(GOOS)-$(GOARCH)$(BINARY_EXT)
 
-S3URL = s3://garotate.qubling.cloud/releases
+S3BASEURL := s3://garotate.qubling.cloud
+S3BUCKET ?= releases
+S3URL = $(S3BASEURL)/$(S3BUCKET)
 
 .PHONY: upload-release-binary upload-release-binary-universal
 upload-release-binary: release-binary
