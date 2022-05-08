@@ -203,26 +203,15 @@ func TestSadManagerFailToRotate(t *testing.T) {
 }
 
 type testStorage struct {
-	storage map[string]map[string]string
+	storage   map[string]map[string]string
+	lastSaved time.Time
 }
 
 func (t *testStorage) Name() string {
 	return "test storage"
 }
 
-func (t *testStorage) LastSaved(
-	ctx context.Context,
-	store secret.Storage,
-	key string,
-) (time.Time, error) {
-	return time.Now(), nil
-}
-
-func (t *testStorage) SaveKeys(
-	ctx context.Context,
-	store secret.Storage,
-	ss secret.Map,
-) error {
+func (t *testStorage) testStorage(store secret.Storage) map[string]string {
 	if t.storage == nil {
 		t.storage = make(map[string]map[string]string)
 	}
@@ -231,8 +220,30 @@ func (t *testStorage) SaveKeys(
 		t.storage[store.Name()] = make(map[string]string)
 	}
 
+	return t.storage[store.Name()]
+}
+
+func (t *testStorage) LastSaved(
+	ctx context.Context,
+	store secret.Storage,
+	key string,
+) (time.Time, error) {
+	ts := t.testStorage(store)
+	if _, found := ts[key]; !found {
+		return time.Time{}, secret.ErrKeyNotFound
+	}
+	return t.lastSaved, nil
+}
+
+func (t *testStorage) SaveKeys(
+	ctx context.Context,
+	store secret.Storage,
+	ss secret.Map,
+) error {
+	ts := t.testStorage(store)
+
 	for k, v := range ss {
-		t.storage[store.Name()][k] = v
+		ts[k] = v
 	}
 
 	return nil
@@ -244,7 +255,9 @@ func (b *testStorageBuilder) Build(
 	ctx context.Context,
 	c *config.Plugin,
 ) (plugin.Instance, error) {
-	return new(testStorage), nil
+	return &testStorage{
+		lastSaved: futureDate,
+	}, nil
 }
 
 func init() {
@@ -260,44 +273,103 @@ func TestHappyRotationStorage(t *testing.T) {
 			},
 		},
 	)
-	c := NewTestClient()
-	m := New(c, 0, false,
-		pluginMgr,
-		[]config.Secret{
-			{
-				SecretName: "Matthew",
-				Storages: []config.StorageMap{
-					{
-						StorageClient: "test",
-						StorageName:   "Matthew",
-						Keys: config.KeyMap{
-							"alpha": "omega",
+
+	tstoreSettings := []testStorage{
+		{
+			storage:   nil,
+			lastSaved: pastDate,
+		},
+		{
+			storage: map[string]map[string]string{
+				"Matthew": map[string]string{
+					"omega": "hunter2",
+					"beta":  "hunter",
+				},
+			},
+			lastSaved: pastDate,
+		},
+	}
+
+	for _, tss := range tstoreSettings {
+		c := NewTestClient()
+		c.lastRotated = futureDate
+		m := New(c, 0, false,
+			pluginMgr,
+			[]config.Secret{
+				{
+					SecretName: "Matthew",
+					Storages: []config.StorageMap{
+						{
+							StorageClient: "test",
+							StorageName:   "Matthew",
+							Keys: config.KeyMap{
+								"alpha": "omega",
+							},
 						},
 					},
 				},
 			},
-		},
-	)
+		)
 
-	ctx := context.Background()
-	err := m.RotateSecrets(ctx)
+		// cheating: we trigger the lazy construction here so we can manipulate
+		// the state of the test object. This is highly dependent on how plugin
+		// instance caching works.
+		ctx := context.Background()
+		store, err := pluginMgr.Instance(ctx, "test")
 
-	assert.NoError(t, err, "got no errors during rotation")
+		assert.NoError(t, err, "got no errors retrieving storage instance")
 
-	store, err := pluginMgr.Instance(ctx, "test")
+		tstore, ok := store.(*testStorage)
+		require.True(t, ok, "type coercion to testStorage works")
 
-	assert.NoError(t, err, "got no errors retrieving storage instance")
+		// ensure we have a clean store before rotation
+		tstore.storage = tss.storage
+		tstore.lastSaved = tss.lastSaved
 
-	tstore, ok := store.(*testStorage)
-	require.True(t, ok, "type coercion to testStorage works")
+		err = m.RotateSecrets(ctx)
 
-	assert.Equal(t, tstore.storage,
-		map[string]map[string]string{
-			"Matthew": map[string]string{
-				"omega": "one",
-				"beta":  "two",
+		assert.NoError(t, err, "got no errors during rotation")
+
+		assert.Equal(t, tstore.storage,
+			map[string]map[string]string{
+				"Matthew": map[string]string{
+					"omega": "one",
+					"beta":  "two",
+				},
 			},
-		},
-		"expected keys found in store",
-	)
+			"expected keys found in store",
+		)
+	}
 }
+
+// func TestHappyNeedsRotationByStorage(t *testing.T) {
+// 	pluginMgr := plugin.NewManager(
+// 		config.PluginList{
+// 			"test": config.Plugin{
+// 				Name: "test",
+// 				Package: "testStorage",
+// 			},
+// 		},
+// 	)
+// 	c := NewTestClient()
+// 	m := New(c, 0, false,
+// 		pluginMgr,
+// 		[]config.Secret{
+// 			{
+// 				SecretName: "Thomas",
+// 				Storages: []config.StorageMap{
+// 					{
+// 						StorageClient: "test",
+// 						StorageName: "Thomas",
+// 						Keys: config.KeyMap{
+// 							"alpha": "omega",
+// 						},
+// 					},
+// 				},
+// 			},
+// 		},
+// 	)
+//
+// 	ctx := context.Background()
+// 	err := m.
+// }

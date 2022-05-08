@@ -126,7 +126,7 @@ func (m *Manager) needsRotation(
 			m.client.Keys(),
 		)
 
-		for _, storeKey := range storeKeys {
+		for storeKey := range storeKeys {
 			saved, err := store.LastSaved(ctx, sm, storeKey)
 			if err != nil {
 				// key not found? we need it, so let's rotate
