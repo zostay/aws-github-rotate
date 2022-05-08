@@ -20,24 +20,28 @@ executors:
 jobs:
   build-binary:
     executor: linux
+    environment:
+      TAG: << pipeline.git.tag >>
     steps:
     - checkout
     - run: apt-get update
     - run: apt-get install --yes awscli
-    - run: make upload-release-binary S3BUCKET=<< pipeline.git.tag >> TARGET_ARCH=amd64
-    - run: make upload-release-binary S3BUCKET=<< pipeline.git.tag >> TARGET_ARCH=arm64
-    - run: make upload-release-binary S3BUCKET=<< pipeline.git.tag >> TARGET_OS=windows TARGET_ARCH=amd64
-    - run: make upload-release-binary S3BUCKET=<< pipeline.git.tag >> TARGET_OS=windows TARGET_ARCH=arm64
-    - run: make upload-release-binary S3BUCKET=<< pipeline.git.tag >> TARGET_OS=windows TARGET_ARCH=386
+    - run: make upload-release-binary S3BUCKET=$TAG TARGET_ARCH=amd64
+    - run: make upload-release-binary S3BUCKET=$TAG TARGET_ARCH=arm64
+    - run: make upload-release-binary S3BUCKET=$TAG TARGET_OS=windows TARGET_ARCH=amd64
+    - run: make upload-release-binary S3BUCKET=$TAG TARGET_OS=windows TARGET_ARCH=arm64
+    - run: make upload-release-binary S3BUCKET=$TAG TARGET_OS=windows TARGET_ARCH=386
 
   build-universal-binary:
     executor: macos
+    environment:
+      TAG: << pipeline.git.tag >>
     steps:
     - checkout
     - go/install:
         version: "1.18"
     - run: brew install awscli || true
-    - run: make upload-release-binary-universal S3BUCKET=<< pipeline.git.tag >>
+    - run: make upload-release-binary-universal S3BUCKET=$TAG
 
 # WIP
 #   notify-github-to-release:
