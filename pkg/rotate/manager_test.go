@@ -20,6 +20,11 @@ var (
 		0, 0, 0, 0,
 		time.UTC,
 	)
+	recentButPastDate = time.Date(
+		time.Now().Year(), time.Now().Month(), time.Now().Day(),
+		time.Now().Hour()-12, 0, 0, 0,
+		time.UTC,
+	)
 	futureDate = time.Date(
 		time.Now().Year()+1, time.April, 1,
 		0, 0, 0, 0,
@@ -277,7 +282,7 @@ func TestHappyRotationStorage(t *testing.T) {
 	tstoreSettings := []testStorage{
 		{
 			storage:   nil,
-			lastSaved: pastDate,
+			lastSaved: futureDate,
 		},
 		{
 			storage: map[string]map[string]string{
@@ -292,8 +297,8 @@ func TestHappyRotationStorage(t *testing.T) {
 
 	for _, tss := range tstoreSettings {
 		c := NewTestClient()
-		c.lastRotated = futureDate
-		m := New(c, 0, false,
+		c.lastRotated = recentButPastDate
+		m := New(c, 24*time.Hour, false,
 			pluginMgr,
 			[]config.Secret{
 				{
@@ -342,34 +347,79 @@ func TestHappyRotationStorage(t *testing.T) {
 	}
 }
 
-// func TestHappyNeedsRotationByStorage(t *testing.T) {
-// 	pluginMgr := plugin.NewManager(
-// 		config.PluginList{
-// 			"test": config.Plugin{
-// 				Name: "test",
-// 				Package: "testStorage",
-// 			},
-// 		},
-// 	)
-// 	c := NewTestClient()
-// 	m := New(c, 0, false,
-// 		pluginMgr,
-// 		[]config.Secret{
-// 			{
-// 				SecretName: "Thomas",
-// 				Storages: []config.StorageMap{
-// 					{
-// 						StorageClient: "test",
-// 						StorageName: "Thomas",
-// 						Keys: config.KeyMap{
-// 							"alpha": "omega",
-// 						},
-// 					},
-// 				},
-// 			},
-// 		},
-// 	)
-//
-// 	ctx := context.Background()
-// 	err := m.
-// }
+func TestHappyRotationStorageSkipping(t *testing.T) {
+	pluginMgr := plugin.NewManager(
+		config.PluginList{
+			"test": config.Plugin{
+				Name:    "test",
+				Package: "testStorage",
+			},
+		},
+	)
+
+	fixtures := []struct {
+		moniker string
+		store   testStorage
+	}{
+		{
+			moniker: "with existing storage",
+			store: testStorage{
+				storage: map[string]map[string]string{
+					"Matthew": map[string]string{
+						"omega": "hunter2",
+						"beta":  "hunter",
+					},
+				},
+				lastSaved: futureDate,
+			},
+		},
+	}
+
+	for _, fixture := range fixtures {
+		tss := fixture.store
+		c := NewTestClient()
+		c.lastRotated = recentButPastDate
+		m := New(c, 24*time.Hour, false,
+			pluginMgr,
+			[]config.Secret{
+				{
+					SecretName: "Matthew",
+					Storages: []config.StorageMap{
+						{
+							StorageClient: "test",
+							StorageName:   "Matthew",
+							Keys: config.KeyMap{
+								"alpha": "omega",
+							},
+						},
+					},
+				},
+			},
+		)
+
+		// cheating: we trigger the lazy construction here so we can manipulate
+		// the state of the test object. This is highly dependent on how plugin
+		// instance caching works.
+		ctx := context.Background()
+		store, err := pluginMgr.Instance(ctx, "test")
+
+		assert.NoErrorf(t, err,
+			"got no errors retrieving storage instance [%s]", fixture.moniker)
+
+		tstore, ok := store.(*testStorage)
+		require.Truef(t, ok, "type coercion to testStorage works [%s]",
+			fixture.moniker)
+
+		// ensure we have a clean store before rotation
+		tstore.storage = tss.storage
+		tstore.lastSaved = tss.lastSaved
+
+		err = m.RotateSecrets(ctx)
+
+		assert.NoErrorf(t, err, "got no errors during rotation [%s]",
+			fixture.moniker)
+
+		assert.Equalf(t, tss.storage, tstore.storage,
+			"keys in storage are unchanged [%s]", fixture.moniker)
+	}
+}
