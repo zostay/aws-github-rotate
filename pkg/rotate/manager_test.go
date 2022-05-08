@@ -261,6 +261,15 @@ func (t *testStorage) SaveKeys(
 	return nil
 }
 
+type testRotationBuilder struct{}
+
+func (b *testRotationBuilder) Build(
+	ctx context.Context,
+	c *config.Plugin,
+) (plugin.Instance, error) {
+	return NewTestClient(), nil
+}
+
 type testStorageBuilder struct{}
 
 func (b *testStorageBuilder) Build(
@@ -283,6 +292,7 @@ func (b *testStorageBuilder) Build(
 
 func init() {
 	plugin.Register("testStorage", new(testStorageBuilder))
+	plugin.Register("testRotation", new(testRotationBuilder))
 }
 
 func TestHappyRotationStorage(t *testing.T) {
@@ -486,6 +496,48 @@ func TestSadRotationBrokenStorage(t *testing.T) {
 				Options: map[string]any{
 					"failLastSaved": 0,
 				},
+			},
+		},
+	)
+
+	c := NewTestClient()
+	c.lastRotated = recentButPastDate
+	m := New(c, 24*time.Hour, false,
+		pluginMgr,
+		[]config.Secret{
+			{
+				SecretName: "Thomas",
+				Storages: []config.StorageMap{
+					{
+						StorageClient: "test",
+						StorageName:   "Thomas",
+						Keys: config.KeyMap{
+							"alpha": "omega",
+						},
+					},
+				},
+			},
+		},
+	)
+
+	// cheating: we trigger the lazy construction here so we can manipulate
+	// the state of the test object. This is highly dependent on how plugin
+	// instance caching works.
+	ctx := context.Background()
+
+	err := m.RotateSecrets(ctx)
+
+	// TODO It would be nice to test for log messages.
+
+	assert.NoError(t, err, "error occurrd, but only logged")
+}
+
+func TestSadRotationStorageWrongType(t *testing.T) {
+	pluginMgr := plugin.NewManager(
+		config.PluginList{
+			"test": config.Plugin{
+				Name:    "test",
+				Package: "testRotation",
 			},
 		},
 	)
