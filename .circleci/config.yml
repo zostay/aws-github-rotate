@@ -51,7 +51,9 @@ jobs:
 workflows:
   all-binaries:
     when:
-      matches: [ << pipeline.git.tag >>, '^release-(\d+\.\d+(-[a-z]+\d+))$' ]
+      matches:
+        value: << pipeline.git.tag >>
+        pattern: '^release-(\d+\.\d+(-[a-z]+\d+))$'
 
     jobs:
     - build-binary
