@@ -1,13 +1,15 @@
 ---
 # plugins lists the configurations to use for rotation, disablement, and
 # storage. For now, every configuration must define this section exactly like
-# this. The names "github" and "IAM" could be changed, but nothing else. These
-# two plugins must be configured exactly this way.
+# this. The names "CircleCI", "github", and "IAM" could be changed, but nothing
+# else. These plugins must be configured exactly this way.
 plugins:
   github:
     package: github.com/zostay/garotate/pkg/plugin/github
   IAM:
     package: github.com/zostay/garotate/pkg/plugin/iam
+  CircleCI:
+    package: github.com/zostay/garotate/pkg/plugin/circleci
 
 # The rotations section configures rotation policies. Each item in the list has
 # the following keys:
@@ -17,7 +19,7 @@ plugins:
 # rotate_after: The duration setting that determines how long to wait before
 #   rotating the secret. The first run of the rotation tool after this amount of
 #   time has passed since last rotation will trigger rotation.
-# secret_set: This is the list of secrets that will be rotated according to this
+# secret_set: This is the slist of secrets that will be rotated according to this
 #   policy.
 rotations:
   - client: IAM
@@ -76,3 +78,5 @@ secret_sets:
         storages:
           - storage: github
             name: zostay/postfix
+          - storage: CircleCI
+            name: gh/zostay/postfix

@@ -9,9 +9,25 @@ services unavailable).
 
 # Getting Started
 
-Currently, this tool does not provide much in the way of help for deployment.
-You will need to have Golang installed at least. Installing it from Go just
-requires:
+## Downloadable Release Binaries
+
+Precompiled binaries are provided through the github release system:
+
+1. Go to the [Releases](https://github.com/zostay/garotate/releases) page.
+2. Find the latest release.
+3. Click on heading labeled "Assets".
+4. Click on the file that matches your operating system and architecture.
+5. Put it in an appropriate directory for running it (on a local Linux or Apple
+   laptop, this is usually `/usr/local/bin`). You may want to rename it to just
+   `garotate` in the process:
+
+```bash
+sudo cp ~/Downloads/garotate-darwin-amd64 /usr/local/bin/garotate
+```
+
+## Build From Source
+
+You will need to have Golang installed. Installing it from Go just requires:
 
 ```bash
 go install github.com/zostay/garotate@latest
@@ -38,13 +54,15 @@ Here's an example configuration file:
 ---
 # plugins lists the configurations to use for rotation, disablement, and
 # storage. For now, every configuration must define this section exactly like
-# this. The names "github" and "IAM" could be changed, but nothing else. These
-# two plugins must be configured exactly this way.
+# this. The names "CircleCI", "github", and "IAM" could be changed, but nothing
+# else. These plugins must be configured exactly this way.
 plugins:
   github:
     package: github.com/zostay/garotate/pkg/plugin/github
   IAM:
     package: github.com/zostay/garotate/pkg/plugin/iam
+  CircleCI:
+    package: github.com/zostay/garotate/pkg/plugin/circleci
 
 # The rotations section configures rotation policies. Each item in the list has
 # the following keys:
@@ -113,6 +131,8 @@ secret_sets:
         storages:
           - storage: github
             name: zostay/postfix
+          - storage: CircleCI
+            name: gh/zostay/postfix
 ```
 
 ## AWS Plugin Configuration
@@ -133,10 +153,18 @@ following permissions:
 * iam:DeleteAccessKey
 * iam:UpdateAccessKey
 
+## CircleCI Plugin Configuration
+
+You must provide a `CIRCLECI_TOKEN` in environment. This must be set to a
+CircleCI API token.
+
+CircleCI provides instructions on [Managing API
+Tokens](https://circleci.com/docs/2.0/managing-api-tokens/) on their web site.
+
 ## Github Plugin Configuration.
 
-You must provide a `GITHUB_TOKEN` with `repo` permissions for the github plugin
-to work.
+You must provide a `GITHUB_TOKEN` environment variable. This must be set to a
+Github token with `repo` permissions for the github plugin to work.
 
 Github provides instructions on [creating a personal access
 token](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/creating-a-personal-access-token).
@@ -158,6 +186,7 @@ performed either via environment or configuration file.
 Currently, the service supports these plugins:
 
 * Rotation of [AWS IAM users](https://github.com/zostay/garotate/pkg/plugin/iam)
+* Storage in [CircleCI project environment variables](https://github.com/zostay/garotate/pkg/plugin/circleci)
 * Storage in [github action secrets](https://github.com/zostay/garotate/pkg/plugin/github)
 
 The plugins are divided into three types, rotation, disablement, and storage.
@@ -205,6 +234,12 @@ disablement clients for rotating AWS IAM user accounts.
 
 ## Storage Plugins
 
+### CircleCI Project Environment Variables
+
+The CircleCI project environment variables plugin provides an implementation of
+the storage client. It stores the keys following rotation into the environment
+variables of a named project.
+
 ### Github Action Secrets
 
 The github action secrets plugin provides an implementation of the storage
@@ -221,7 +256,7 @@ very shortly, all of my access keys were being flagged as being old, so I wanted
 a tool to perform rotation.
 
 I could have found some tool that already does that, but a quick search didn't
-find one. (It waas so quick, I might not have read the results or maybe even hit
+find one. (It was so quick, I might not have read the results or maybe even hit
 the search button in DuckDuckGo. I don't remember at this point.) It seemed like
 a fun project to do while I was between jobs. It took a bit longer than expected
 (of course), so I'm just finishing up writing this a month into the new job.
