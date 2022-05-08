@@ -423,3 +423,40 @@ func TestHappyRotationStorageSkipping(t *testing.T) {
 			"keys in storage are unchanged [%s]", fixture.moniker)
 	}
 }
+
+func TestSadRotationMissingStorage(t *testing.T) {
+	pluginMgr := plugin.NewManager(
+		config.PluginList{},
+	)
+
+	c := NewTestClient()
+	c.lastRotated = recentButPastDate
+	m := New(c, 24*time.Hour, false,
+		pluginMgr,
+		[]config.Secret{
+			{
+				SecretName: "Thomas",
+				Storages: []config.StorageMap{
+					{
+						StorageClient: "test",
+						StorageName:   "Thomas",
+						Keys: config.KeyMap{
+							"alpha": "omega",
+						},
+					},
+				},
+			},
+		},
+	)
+
+	// cheating: we trigger the lazy construction here so we can manipulate
+	// the state of the test object. This is highly dependent on how plugin
+	// instance caching works.
+	ctx := context.Background()
+
+	err := m.RotateSecrets(ctx)
+
+	// TODO It would be nice to test for log messages.
+
+	assert.NoError(t, err, "error occurrd, but only logged")
+}
