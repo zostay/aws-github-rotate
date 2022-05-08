@@ -58,11 +58,11 @@ Here's an example configuration file:
 # else. These plugins must be configured exactly this way.
 plugins:
   github:
-    package: github.com/zostay/garotate/pkg/plugin/github
+    package: github.com/zostay/garotate/pkg/plugin/github/action/secret
   IAM:
-    package: github.com/zostay/garotate/pkg/plugin/iam
+    package: github.com/zostay/garotate/pkg/plugin/aws/iam/user/access
   CircleCI:
-    package: github.com/zostay/garotate/pkg/plugin/circleci
+    package: github.com/zostay/garotate/pkg/plugin/circleci/project/env
 
 # The rotations section configures rotation policies. Each item in the list has
 # the following keys:
@@ -185,9 +185,9 @@ performed either via environment or configuration file.
 
 Currently, the service supports these plugins:
 
-* Rotation of [AWS IAM users](https://github.com/zostay/garotate/pkg/plugin/iam)
-* Storage in [CircleCI project environment variables](https://github.com/zostay/garotate/pkg/plugin/circleci)
-* Storage in [github action secrets](https://github.com/zostay/garotate/pkg/plugin/github)
+* Rotation of [AWS IAM users](https://github.com/zostay/garotate/pkg/plugin/aws/iam/user/access)
+* Storage in [CircleCI project environment variables](https://github.com/zostay/garotate/pkg/plugin/circleci/project/env)
+* Storage in [github action secrets](https://github.com/zostay/garotate/pkg/plugin/github/action/secret)
 
 The plugins are divided into three types, rotation, disablement, and storage.
 Typically, the rotation and disablement plugins are going to be the same plugin.

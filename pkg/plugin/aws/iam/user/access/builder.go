@@ -1,4 +1,4 @@
-package iam
+package access
 
 import (
 	"context"
@@ -6,6 +6,7 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/iam"
+
 	"github.com/zostay/garotate/pkg/config"
 	"github.com/zostay/garotate/pkg/plugin"
 )

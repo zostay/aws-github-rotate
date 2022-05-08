@@ -1,4 +1,4 @@
-package circleci
+package env
 
 import (
 	"context"

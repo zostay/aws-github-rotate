@@ -1,4 +1,4 @@
-package github
+package secret
 
 import (
 	"context"
@@ -6,9 +6,10 @@ import (
 	"reflect"
 
 	"github.com/google/go-github/v42/github"
+	"golang.org/x/oauth2"
+
 	"github.com/zostay/garotate/pkg/config"
 	"github.com/zostay/garotate/pkg/plugin"
-	"golang.org/x/oauth2"
 )
 
 // builder implements the plugin.Builder interface and provides the

@@ -1,6 +1,6 @@
 // Package circleci provides a plugin that implemetns the
 // rotate.Storage interface for storing keys in CircleCI environment variables.
-package circleci
+package env
 
 import (
 	"bytes"
