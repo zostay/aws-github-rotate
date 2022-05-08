@@ -50,14 +50,15 @@ jobs:
 
 workflows:
   all-binaries:
-    when:
-      matches:
-        value: << pipeline.git.tag >>
-        pattern: '^release-(\d+\.\d+(-[a-z]+\d+))$'
-
     jobs:
-    - build-binary
-    - build-universal-binary
+    - build-binary:
+        filters:
+          tags:
+            only: '^release-(\d+\.\d+(-[a-z]+\d+))$'
+    - build-universal-binary:
+        filters:
+          tags:
+            only: '^release-(\d+\.\d+(-[a-z]+\d+))$'
 
 # WIP
 #     - notify-github-to-release:
