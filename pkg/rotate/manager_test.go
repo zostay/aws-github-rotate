@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	"github.com/zostay/garotate/pkg/config"
 	"github.com/zostay/garotate/pkg/plugin"
 	"github.com/zostay/garotate/pkg/secret"
@@ -82,7 +84,10 @@ func (c *testClient) RotateSecret(
 		return nil, fmt.Errorf("rotate bad stuff")
 	} else {
 		c.failRotateSecret--
-		return nil, nil
+		return secret.Map{
+			"alpha": "one",
+			"beta":  "two",
+		}, nil
 	}
 }
 
@@ -195,4 +200,104 @@ func TestSadManagerFailToRotate(t *testing.T) {
 	}
 
 	assert.Equal(t, callSecrets, c.lastCallSecrets, "all four calls made even when sad")
+}
+
+type testStorage struct {
+	storage map[string]map[string]string
+}
+
+func (t *testStorage) Name() string {
+	return "test storage"
+}
+
+func (t *testStorage) LastSaved(
+	ctx context.Context,
+	store secret.Storage,
+	key string,
+) (time.Time, error) {
+	return time.Now(), nil
+}
+
+func (t *testStorage) SaveKeys(
+	ctx context.Context,
+	store secret.Storage,
+	ss secret.Map,
+) error {
+	if t.storage == nil {
+		t.storage = make(map[string]map[string]string)
+	}
+
+	if _, ok := t.storage[store.Name()]; !ok {
+		t.storage[store.Name()] = make(map[string]string)
+	}
+
+	for k, v := range ss {
+		t.storage[store.Name()][k] = v
+	}
+
+	return nil
+}
+
+type testStorageBuilder struct{}
+
+func (b *testStorageBuilder) Build(
+	ctx context.Context,
+	c *config.Plugin,
+) (plugin.Instance, error) {
+	return new(testStorage), nil
+}
+
+func init() {
+	plugin.Register("testStorage", new(testStorageBuilder))
+}
+
+func TestHappyRotationStorage(t *testing.T) {
+	pluginMgr := plugin.NewManager(
+		config.PluginList{
+			"test": config.Plugin{
+				Name:    "test",
+				Package: "testStorage",
+			},
+		},
+	)
+	c := NewTestClient()
+	m := New(c, 0, false,
+		pluginMgr,
+		[]config.Secret{
+			{
+				SecretName: "Matthew",
+				Storages: []config.StorageMap{
+					{
+						StorageClient: "test",
+						StorageName:   "Matthew",
+						Keys: config.KeyMap{
+							"alpha": "omega",
+						},
+					},
+				},
+			},
+		},
+	)
+
+	ctx := context.Background()
+	err := m.RotateSecrets(ctx)
+
+	assert.NoError(t, err, "got no errors during rotation")
+
+	store, err := pluginMgr.Instance(ctx, "test")
+
+	assert.NoError(t, err, "got no errors retrieving storage instance")
+
+	tstore, ok := store.(*testStorage)
+	require.True(t, ok, "type coercion to testStorage works")
+
+	assert.Equal(t, tstore.storage,
+		map[string]map[string]string{
+			"Matthew": map[string]string{
+				"omega": "one",
+				"beta":  "two",
+			},
+		},
+		"expected keys found in store",
+	)
 }
