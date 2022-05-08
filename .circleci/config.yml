@@ -12,6 +12,11 @@ executors:
     macos:
       xcode: 13.3.1
 
+# WIP
+#   notifiy:
+#     docker:
+#       - image: golang:1.18
+
 jobs:
   build-binary:
     executor: linux
@@ -34,11 +39,26 @@ jobs:
     - run: brew install awscli || true
     - run: make upload-release-binary-universal
 
+# WIP
+#   notify-github-to-release:
+#     executor: notify
+#     steps:
+#     - checkout
+#     - run: wget https://github.com/cli/cli/releases/download/v2.9.0/gh_2.9.0_linux_amd64.deb
+#     - run: dpkg -i gh_2.9.0_linux_amd64.deb
+#     - run: gh ...
+
 workflows:
   all-binaries:
     when:
-      equal: [ << pipeline.git.branch >>, 'circleci' ]
+      matches: [ << pipeline.git.tag >>, '^release-(\d+\.\d+(-[a-z]+\d+))$' ]
 
     jobs:
     - build-binary
     - build-universal-binary
+
+# WIP
+#     - notify-github-to-release:
+#         requires:
+#         - build-binary
+#         - build-universal-binary
