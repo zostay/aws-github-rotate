@@ -211,6 +211,7 @@ type testStorage struct {
 	storage       map[string]map[string]string
 	lastSaved     time.Time
 	failLastSaved int
+	failSaveKeys  int
 }
 
 func (t *testStorage) Name() string {
@@ -252,6 +253,12 @@ func (t *testStorage) SaveKeys(
 	store secret.Storage,
 	ss secret.Map,
 ) error {
+	if t.failSaveKeys == 0 {
+		return fmt.Errorf("save keys bad stuff")
+	} else {
+		t.failSaveKeys--
+	}
+
 	ts := t.testStorage(store)
 
 	for k, v := range ss {
@@ -284,9 +291,20 @@ func (b *testStorageBuilder) Build(
 		}
 		failLastSaved = flsi
 	}
+
+	failSaveKeys := -1
+	if fsk, ok := c.Options["failSaveKeys"]; ok {
+		fski, ok := fsk.(int)
+		if !ok {
+			panic("test configuration is wrong in the failSaveKeys key")
+		}
+		failSaveKeys = fski
+	}
+
 	return &testStorage{
 		lastSaved:     futureDate,
 		failLastSaved: failLastSaved,
+		failSaveKeys:  failSaveKeys,
 	}, nil
 }
 
@@ -370,6 +388,78 @@ func TestHappyRotationStorage(t *testing.T) {
 			},
 			"expected keys found in store",
 		)
+	}
+}
+
+func TestHappyRotationStorageDryRun(t *testing.T) {
+	pluginMgr := plugin.NewManager(
+		config.PluginList{
+			"test": config.Plugin{
+				Name:    "test",
+				Package: "testStorage",
+			},
+		},
+	)
+
+	tstoreSettings := []testStorage{
+		{
+			storage: map[string]map[string]string{
+				"Matthew": nil,
+			},
+			lastSaved: futureDate,
+		},
+		{
+			storage: map[string]map[string]string{
+				"Matthew": map[string]string{
+					"omega": "hunter2",
+					"beta":  "hunter",
+				},
+			},
+			lastSaved: pastDate,
+		},
+	}
+
+	for _, tss := range tstoreSettings {
+		c := NewTestClient()
+		c.lastRotated = recentButPastDate
+		m := New(c, 24*time.Hour, true,
+			pluginMgr,
+			[]config.Secret{
+				{
+					SecretName: "Matthew",
+					Storages: []config.StorageMap{
+						{
+							StorageClient: "test",
+							StorageName:   "Matthew",
+							Keys: config.KeyMap{
+								"alpha": "omega",
+							},
+						},
+					},
+				},
+			},
+		)
+
+		// cheating: we trigger the lazy construction here so we can manipulate
+		// the state of the test object. This is highly dependent on how plugin
+		// instance caching works.
+		ctx := context.Background()
+		store, err := pluginMgr.Instance(ctx, "test")
+
+		assert.NoError(t, err, "got no errors retrieving storage instance")
+
+		tstore, ok := store.(*testStorage)
+		require.True(t, ok, "type coercion to testStorage works")
+
+		// ensure we have a clean store before rotation
+		tstore.storage = tss.storage
+		tstore.lastSaved = tss.lastSaved
+
+		err = m.RotateSecrets(ctx)
+
+		assert.NoError(t, err, "got no errors during rotation")
+
+		assert.Equal(t, tss.storage, tstore.storage, "dry run changes nothing")
 	}
 }
 
@@ -484,7 +574,7 @@ func TestSadRotationMissingStorage(t *testing.T) {
 
 	// TODO It would be nice to test for log messages.
 
-	assert.NoError(t, err, "error occurrd, but only logged")
+	assert.NoError(t, err, "error occurred, but only logged")
 }
 
 func TestSadRotationBrokenStorage(t *testing.T) {
@@ -529,7 +619,7 @@ func TestSadRotationBrokenStorage(t *testing.T) {
 
 	// TODO It would be nice to test for log messages.
 
-	assert.NoError(t, err, "error occurrd, but only logged")
+	assert.NoError(t, err, "error occurred, but only logged")
 }
 
 func TestSadRotationStorageWrongType(t *testing.T) {
@@ -571,5 +661,51 @@ func TestSadRotationStorageWrongType(t *testing.T) {
 
 	// TODO It would be nice to test for log messages.
 
-	assert.NoError(t, err, "error occurrd, but only logged")
+	assert.NoError(t, err, "error occurred, but only logged")
+}
+
+func TestSadRotationStorageBrokenSaveKeys(t *testing.T) {
+	pluginMgr := plugin.NewManager(
+		config.PluginList{
+			"test": config.Plugin{
+				Name:    "test",
+				Package: "testStorage",
+				Options: map[string]any{
+					"failLastSaved": -1,
+					"failSaveKeys":  0,
+				},
+			},
+		},
+	)
+
+	c := NewTestClient()
+	c.lastRotated = recentButPastDate
+	m := New(c, 24*time.Hour, false,
+		pluginMgr,
+		[]config.Secret{
+			{
+				SecretName: "Thomas",
+				Storages: []config.StorageMap{
+					{
+						StorageClient: "test",
+						StorageName:   "Thomas",
+						Keys: config.KeyMap{
+							"alpha": "omega",
+						},
+					},
+				},
+			},
+		},
+	)
+
+	// cheating: we trigger the lazy construction here so we can manipulate
+	// the state of the test object. This is highly dependent on how plugin
+	// instance caching works.
+	ctx := context.Background()
+
+	err := m.RotateSecrets(ctx)
+
+	// TODO It would be nice to test for log messages.
+
+	assert.Error(t, err, "expected error occurred")
 }
