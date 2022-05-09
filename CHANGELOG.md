@@ -1,6 +1,8 @@
 # Changelog
 
-* Fixed missing documentation for CircleCI plugin.
+## v0.1-alpha2
+ Sun May  8 23:53:21 2022
+
 * Renamed iam plugin to `github.com/zostay/garotate/pkg/plugin/aws/iam/user/access`
 * Renamed circleci plugin to `github.com/zostay/garotate/pkg/plugin/circleci/project/env`
 * Renamed github plugin to `github.com/zostay/garotate/pkg/plugin/github/action/secret`
