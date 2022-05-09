@@ -55,15 +55,16 @@ sub release_notes {
 }
 
 sub MAIN {
-    my @asssets = @_;
+    my @assets = @_;
 
-    usage() unless version_ok($version)
+    usage() unless @assets > 0;
 
     # version comes from current release tag
     progress_item("Discovering release tag ... ");
     my $release_tag = "";
     capture_run(['git', 'tag', '-l', 'release-*'], sub {
         my ($line) = @_;
+        chomp $line;
         if ($release_tag ne "") {
             progress_quit("Found at least two release tags, '$release_tag' and '$line'.");
         }
