@@ -3,11 +3,11 @@
 use v5.30;
 use warnings;
 
+use lib 'scripts';
+use release;
+
 use Carp qw( confess );
 use Getopt::Long;
-
-my $changelog = "CHANGELOG.md";
-my $dist_dir = "dist";
 
 sub usage {
     print STDERR <<~USAGE;
@@ -21,40 +21,6 @@ usage: $0 <version> <s3url> <assets>...
   hyphen ("-"), including the hyphen, is optional.
 USAGE
   exit 1;
-}
-
-sub slurp_top_entry {
-    my ($file) = @_;
-
-    open my $fh, '<', $file
-        or progress_quit("cannot read $file: $!");
-
-    my $notes = '';
-    my $remainder = '';
-    my $s = 'start';
-    while (<$fh>) {
-        $s eq 'start' && do {
-            next if /^# /;
-            next if /^\s*$/;
-            $s = 'notes';
-            next;
-        };
-        $s eq 'notes' && do {
-            if (/^## /) {
-                $s = 'remainder';
-                $remainder .= $_;
-                next;
-            }
-            $notes .= $_;
-            next;
-        };
-
-        $remainder .= $_;
-    }
-
-    close $file;
-
-    return ($notes, $remainder);
 }
 
 sub finalize_changelog {
@@ -72,65 +38,11 @@ sub finalize_changelog {
     close $fh;
 }
 
-sub capture_run {
-    my ($cmd, $callback) = @_;
-
-    open my $rh, '-|', @$cmd
-        or progress_quit("cannot run '@$cmd': $!");
-
-    while (<$rh>) {
-        $callback->($_);
-    }
-
-    close $rh
-        or progress_quit("cannot complete '@$cmd': $!");
-}
-
-sub slurp_run {
-    my $content = '';
-    capture_run(
-        \@_,
-        sub { $content .= $_ },
-    );
-    return $content;
-}
-
-sub run {
-    capture_run(\@_, sub {});
-}
-
-sub verify_tag {
-    my ($version) = @_;
-
-    my $vout = slurp_run('git', 'tag', '-l', $version);
-    $vout =~ s/^\s+//; $vout =~ s/\s+$//;
-
-    die "Tag named $version is already in use.\n"
-        if $vout eq $version;
-}
-
-sub progress_item {
-    print @_;
-}
-
-sub progress_bullet {
-    say " - ", @_;
-}
-
-sub progress_status {
-    say @_;
-}
-
-sub progress_quit {
-    say "FAILED";
-    confess @_;
-}
-
 sub release_notes {
     my ($version, $notes) = @_;
 
-    open my $rh, '>', "$dist_dir/$version.md"
-        or progress_quit("cannot write to $dist_dir/$version.md: $!");
+    open my $rh, '>', dist_dir . "/$version.md"
+        or progress_quit("cannot write to ".dist_dir."/$version.md: $!");
 
     my $now = localtime;
 
@@ -140,18 +52,34 @@ sub release_notes {
 
     close $rh;
 
-    return "$dist_dir/$version.md";
+    return dist_dir."/$version.md";
 }
 
 sub MAIN {
-    my ($version, $s3url, @assets) = @_;
+    my @asssets = @_;
 
-    usage() unless defined $version && $version =~ /^
-        v\d+                      # major
-        \.
-        \d+                       # minor
-        (?:-(?:alpha|beta|rc)\d+) # keyword
-    $/x;
+    usage() unless version_ok($version)
+
+    # version comes from current release tag
+    progress_item("Discovering release tag ... ");
+    my $release_tag = "";
+    capture_run(['git', 'tag', '-l', 'release-*'], sub {
+        my ($line) = @_;
+        if ($release_tag ne "") {
+            progress_quit("Found at least two release tags, '$release_tag' and '$line'.");
+        }
+        $release_tag = $line;
+    });
+    my $version = $release_tag =~ s/^release-/v/r;
+    if ($version !~ /^v/) {
+        progress_quit("Version tag '$release_tag' could not be converted to version tag.");
+    }
+    progress_status("OK");
+
+    # s3url comes from current release tag
+    progress_item("Reconstructing S3 URL ... ");
+    my $s3url = s3base_url . $release_tag;
+    progress_status("OK");
 
     # Sanity check
     progress_item("Checking for tag $version ... ");
@@ -160,16 +88,16 @@ sub MAIN {
 
     # Finish the change log
     progress_item("Finalizing changelog ... ");
-    my ($notes, $footer) = slurp_top_entry($changelog);
+    my ($notes, $footer) = slurp_top_entry(changelog_file);
     finalize_changelog({
-        changelog => $changelog,
+        changelog => changelog_file,
         notes     => $notes,
         footer    => $footer,
         version   => $version,
     });
 
     # Add updated changelog to the repo
-    run('git', 'add', $changelog);
+    run('git', 'add', changelog_file);
     run('git', 'commit', '-m', 'changelog');
     progress_status("OK");
 
@@ -206,7 +134,7 @@ sub MAIN {
     for my $asset (@assets) {
         progress_item("Pulling $asset from $s3url ... ");
         run(
-            'aws', 's3', 'cp', "$s3url/$asset", "$dist_dir/$asset",
+            'aws', 's3', 'cp', "$s3url/$asset", dist_dir."/$asset",
         );
         progress_status("OK");
     }
@@ -215,7 +143,7 @@ sub MAIN {
     for my $asset (@assets) {
         progress_item("Releasing $asset ... ");
         run(
-            'gh', 'release', 'upload', $version, "$dist_dir/$asset", '--clobber',
+            'gh', 'release', 'upload', $version, dist_dir."/$asset", '--clobber',
         );
         progress_status("OK");
     }

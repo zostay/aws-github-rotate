@@ -1,0 +1,78 @@
+#!/usr/bin/env perl
+
+use v5.30;
+use warnings;
+
+use lib 'scripts';
+use release;
+
+use Carp qw( confess );
+use Getopt::Long;
+
+sub usage {
+    print STDERR <<~USAGE;
+usage: $0 <version>
+
+  <version> must be in the form of:
+
+  v#.#-<word>#
+
+  where <word> may be one of "alpha", "beta", and "rc". Everything following the
+  hyphen ("-"), including the hyphen, is optional.
+USAGE
+  exit 1;
+}
+
+sub MAIN {
+    my ($version) = @_;
+
+    usage() unless version_ok($version);
+
+    my $release_tag = $version =~ s/^v/release-/r;
+    if ($release_tag !~ /^release-/) {
+        confess "Version tag '$version' could not be converted to release tag.";
+    }
+
+    # Sanity check
+    progress_item("Checking for tag $release_tag ... ");
+    verify_tag($release_tag);
+    progress_status("OK");
+
+    # Ensure change log has some changes...
+    progress_item("Sanity checking changelog ... ");
+    my ($notes) = slurp_top_entry(changelog_file);
+    if ($notes !~ /\S/) {
+        progress_quit(
+            "The newest changes section of "
+            .changelog_file
+            ." is empty. Please put something in there."
+        );
+    }
+    progress_status("OK");
+
+    # Create release tag
+    progress_item("Tagging $release_tag ... ");
+    run('git', 'tag', $release_tag);
+    progress_status("OK");
+
+    # Push changes to github
+    progress_item("Publishing $release_tag to trigger release build ... ");
+    run('git', 'push', 'origin', $release_tag);
+    progress_status("OK");
+
+    # Instructions for user go here...
+    print <<INSTRUCTIONS;
+
+A release has been triggered and the prep work is now in progress.
+
+You now need to perform the following next steps:
+
+  1. Monitor CI/CD builds for successful completion.
+  2. Run ./scripts/finish-release <assets>...
+  3. Go to the project releases page and publish.
+
+See ./scripts/README.md for additional instructions.
+INSTRUCTIONS
+}
+
+MAIN(@ARGV);
