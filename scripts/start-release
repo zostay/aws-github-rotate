@@ -34,6 +34,11 @@ sub MAIN {
     }
 
     # Sanity check
+    progress_item("Checking for tag $version ... ");
+    verify_tag($version);
+    progress_status("OK");
+
+    # Sanity check
     progress_item("Checking for tag $release_tag ... ");
     verify_tag($release_tag);
     progress_status("OK");
