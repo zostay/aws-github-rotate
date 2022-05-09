@@ -3,9 +3,9 @@ package main
 
 import (
 	"github.com/zostay/garotate/cmd"
-	_ "github.com/zostay/garotate/pkg/plugin/circleci"
-	_ "github.com/zostay/garotate/pkg/plugin/github"
-	_ "github.com/zostay/garotate/pkg/plugin/iam"
+	_ "github.com/zostay/garotate/pkg/plugin/aws/iam/user/access"
+	_ "github.com/zostay/garotate/pkg/plugin/circleci/project/env"
+	_ "github.com/zostay/garotate/pkg/plugin/github/action/secret"
 )
 
 // main executes the command.

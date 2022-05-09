@@ -1,9 +1,16 @@
 package release;
 
-use Exporter;
+use v5.30;
+use warnings;
 
+use Carp qw( confess );
+require Exporter;
+
+our @ISA = qw( Exporter );
 our @EXPORT = qw(
     version_ok
+    git_has_tag
+    verify_tag
     slurp_top_entry
     capture_run
     slurp_run
@@ -19,8 +26,8 @@ our @EXPORT = qw(
 );
 
 use constant changelog_file => 'CHANGELOG.md';
-use constant dist_dir => 'dist';
-use constant s3base_url => 's3://garotate.qubling.cloud/';
+use constant dist_dir       => 'dist';
+use constant s3base_url     => 's3://garotate.qubling.cloud/';
 
 sub version_ok {
     my ($version) = @_;
@@ -36,7 +43,7 @@ sub git_has_tag {
     my ($tag) = @_;
 
     my $tout = slurp_run('git', 'tag', '-l', $tag);
-    $tout =~ s/^\s+//; $vout =~ s/\s+$//;
+    $tout =~ s/^\s+//; $tout =~ s/\s+$//;
 
     return $tout eq $tag;
 }
@@ -126,3 +133,4 @@ sub progress_quit {
     confess @_;
 }
 
+1;

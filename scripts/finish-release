@@ -6,7 +6,6 @@ use warnings;
 use lib 'scripts';
 use release;
 
-use Carp qw( confess );
 use Getopt::Long;
 
 sub usage {

@@ -30,7 +30,7 @@ sub MAIN {
 
     my $release_tag = $version =~ s/^v/release-/r;
     if ($release_tag !~ /^release-/) {
-        confess "Version tag '$version' could not be converted to release tag.";
+        confess("Version tag '$version' could not be converted to release tag.");
     }
 
     # Sanity check
@@ -45,11 +45,11 @@ sub MAIN {
 
     # Ensure change log has some changes...
     progress_item("Sanity checking changelog ... ");
-    my ($notes) = slurp_top_entry(changelog_file);
+    my ($notes) = slurp_top_entry(changelog_file());
     if ($notes !~ /\S/) {
         progress_quit(
             "The newest changes section of "
-            .changelog_file
+            .changelog_file()
             ." is empty. Please put something in there."
         );
     }
