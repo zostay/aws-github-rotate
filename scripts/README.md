@@ -4,6 +4,10 @@ In order to cut a release of garotate, perform the following steps:
 
   1. Run `./scripts/start-release <version>`
 
+     OR
+
+     Run `make start-release VERSION=<version>`
+
      The version number must be in one of the following forms:
 
      * v#.#
@@ -16,6 +20,10 @@ In order to cut a release of garotate, perform the following steps:
   2. Monitor CI/CD builds to ensure successful builds.
 
   3. Run `./scripts/finish-release <assets>...`
+
+     OR
+
+     Run `make finalize-release`
 
      Each `<asset>` is the name of a file to add to the release, which has been
      uploaded to the S3 bucket found here:
