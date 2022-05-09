@@ -1,6 +1,8 @@
 # Changelog
 
 ## v0.1-alpha2
+ Mon May  9 00:04:11 2022
+
  Sun May  8 23:53:21 2022
 
 * Renamed iam plugin to `github.com/zostay/garotate/pkg/plugin/aws/iam/user/access`
