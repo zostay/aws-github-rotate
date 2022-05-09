@@ -147,6 +147,22 @@ sub MAIN {
         );
         progress_status("OK");
     }
+
+    # Delete the release trigger tag
+    progress_item("Removing tag $release_tag ... ");
+    run('git', 'tag', '-d', $release_tag);
+    run('git', 'push', 'origin', ":$release_tag");
+    progress_status("OK");
+
+
+    # Final instructions
+    print <<INSTRUCTIONS;
+
+Your release is now complete but for publishing. Please visit the releases page at the link below to publish the draft release:
+
+  https://github.com/zostay/garotate/releases
+
+INSTRUCTIONS
 }
 
 MAIN(@ARGV)

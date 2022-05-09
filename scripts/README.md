@@ -11,7 +11,7 @@ In order to cut a release of garotate, perform the following steps:
      * v#.#-beta#
      * v#.#-rc#
 
-     The hyphenated forms will result in the prerelease flag being set.
+     The hyphenated forms will result in the pre-release flag being set.
 
   2. Monitor CI/CD builds to ensure successful builds.
 
