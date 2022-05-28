@@ -5,12 +5,11 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"fmt"
-	"io"
 	"strings"
 	"time"
 
 	"github.com/google/go-github/v42/github"
-	"golang.org/x/crypto/nacl/secretbox"
+	"golang.org/x/crypto/nacl/box"
 
 	"github.com/zostay/garotate/pkg/config"
 	"github.com/zostay/garotate/pkg/secret"
@@ -153,15 +152,15 @@ func (c *Client) SaveKeys(
 // sealedBox handles sealing the secret for sending and encoding it as Base64.
 func sealedBox(pk, secret string) (string, error) {
 	var pkBytes [32]byte
-	copy(pkBytes[:], []byte(secret))
+	copy(pkBytes[:], pk)
 	secretBytes := []byte(secret)
 
-	var nonce [24]byte
-	if _, err := io.ReadFull(rand.Reader, nonce[:]); err != nil {
-		return "", fmt.Errorf("failed to generate nonce: %w", err)
-	}
+	out := make([]byte, 0, len(secretBytes)+box.Overhead+len(pkBytes))
 
-	enc := secretbox.Seal(nonce[:], secretBytes, &nonce, &pkBytes)
+	enc, err := box.SealAnonymous(out, secretBytes, &pkBytes, rand.Reader)
+	if err != nil {
+		return "", err
+	}
 	encEnc := base64.StdEncoding.EncodeToString(enc)
 
 	return encEnc, nil
