@@ -6,7 +6,10 @@ jobs:
   quicktest:
     runs-on: ubuntu-latest
     steps:
-    - run: echo ${{ secrets.TEST }}
+    - run: echo "$TEST" > key
+      env:
+        TEST: ${{ secrets.TEST }}
+    - run: cat key
 
   test:
     runs-on: ubuntu-latest
