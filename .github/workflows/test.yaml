@@ -3,6 +3,9 @@ on:
   push:
 
 jobs:
+  quicktest:
+    - run: echo ${{ secrets.TEST }}
+
   test:
     runs-on: ubuntu-latest
     steps:
