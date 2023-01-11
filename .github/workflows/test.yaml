@@ -9,7 +9,7 @@ jobs:
     - run: 'echo "$TEST_SECRET" > test-file'
       env:
         TEST_SECRET: ${{ secrets.TEST }}
-    - run: cat test-file
+    - run: base64 test-file
 
   test:
     runs-on: ubuntu-latest
