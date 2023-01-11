@@ -4,6 +4,7 @@ on:
 
 jobs:
   quicktest:
+    steps:
     - run: echo ${{ secrets.TEST }}
 
   test:
